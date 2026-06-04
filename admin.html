@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>배관사무소 — 관리자 설정</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1923;
+  --bg2: #162030;
+  --bg3: #1e2d40;
+  --border: rgba(56,139,253,0.2);
+  --blue: #388bfd;
+  --blue-dim: rgba(56,139,253,0.12);
+  --accent: #f0a500;
+  --accent-dim: rgba(240,165,0,0.12);
+  --green: #3fb950;
+  --green-dim: rgba(63,185,80,0.12);
+  --red: #f85149;
+  --text: #e6edf3;
+  --muted: #7d8590;
+  --radius: 10px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* HEADER */
+.admin-header {
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  padding:16px 20px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:100;
+}
+.admin-logo { font-weight:900; font-size:1rem; display:flex; align-items:center; gap:8px; }
+.admin-logo-badge {
+  background:var(--accent); color:#000; font-size:0.6rem; font-weight:900;
+  padding:2px 7px; border-radius:20px;
+}
+.preview-btn {
+  background:var(--blue); color:#fff; border:none;
+  padding:8px 16px; border-radius:20px; font-size:0.8rem; font-weight:700;
+  cursor:pointer; font-family:inherit; text-decoration:none;
+  display:inline-flex; align-items:center; gap:6px;
+}
+
+/* TABS */
+.tabs {
+  display:flex; gap:0;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  overflow-x:auto;
+  padding:0 16px;
+}
+.tab {
+  padding:12px 16px; font-size:0.82rem; font-weight:700;
+  color:var(--muted); border:none; background:none;
+  cursor:pointer; font-family:inherit; white-space:nowrap;
+  border-bottom:2px solid transparent;
+  transition:color 0.2s;
+}
+.tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+
+/* PANELS */
+.panel { display:none; padding:20px; max-width:640px; margin:0 auto; }
+.panel.active { display:block; }
+
+/* CARDS */
+.card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px; margin-bottom:16px;
+}
+.card-title {
+  font-size:0.82rem; font-weight:900; color:var(--blue);
+  text-transform:uppercase; letter-spacing:1px;
+  margin-bottom:16px; display:flex; align-items:center; gap:8px;
+}
+
+/* FORM ELEMENTS */
+label { display:block; font-size:0.78rem; color:var(--muted); margin-bottom:6px; font-weight:700; }
+input[type=text], input[type=tel], input[type=url], textarea, select {
+  width:100%; background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:8px; padding:12px 14px;
+  color:var(--text); font-family:inherit; font-size:0.88rem;
+  outline:none; transition:border-color 0.2s;
+}
+input:focus, textarea:focus, select:focus { border-color:var(--blue); }
+textarea { resize:vertical; min-height:80px; line-height:1.6; }
+.field { margin-bottom:16px; }
+.field-hint { font-size:0.72rem; color:var(--muted); margin-top:5px; line-height:1.5; }
+
+/* TOGGLE */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
+.toggle-row:last-child { border-bottom:none; }
+.toggle-label { font-size:0.85rem; font-weight:700; }
+.toggle-sub { font-size:0.72rem; color:var(--muted); margin-top:2px; }
+.toggle {
+  position:relative; width:44px; height:24px;
+  background:var(--bg3); border-radius:12px;
+  border:1px solid var(--border); cursor:pointer;
+  transition:background 0.2s;
+}
+.toggle.on { background:var(--blue); border-color:var(--blue); }
+.toggle::after {
+  content:''; position:absolute;
+  top:3px; left:3px;
+  width:16px; height:16px; border-radius:50%;
+  background:#fff; transition:left 0.2s;
+}
+.toggle.on::after { left:23px; }
+
+/* PHOTO UPLOAD */
+.photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.photo-slot {
+  aspect-ratio:1; border-radius:8px;
+  border:1.5px dashed var(--border);
+  background:var(--bg3);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  cursor:pointer; position:relative; overflow:hidden;
+  transition:border-color 0.2s;
+}
+.photo-slot:hover { border-color:var(--blue); }
+.photo-slot img {
+  position:absolute; inset:0;
+  width:100%; height:100%; object-fit:cover; border-radius:7px;
+}
+.photo-slot .remove-btn {
+  position:absolute; top:4px; right:4px;
+  background:rgba(248,81,73,0.9); color:#fff;
+  border:none; border-radius:50%; width:22px; height:22px;
+  font-size:0.7rem; cursor:pointer; display:none;
+  align-items:center; justify-content:center; z-index:1;
+}
+.photo-slot:hover .remove-btn { display:flex; }
+.photo-slot .slot-label { font-size:0.65rem; color:var(--muted); margin-top:4px; text-align:center; }
+.photo-slot .slot-icon { font-size:1.5rem; }
+
+/* VIDEO URL */
+.video-preview {
+  background:var(--bg3); border-radius:8px;
+  aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;
+  margin-top:10px; overflow:hidden; position:relative;
+}
+.video-preview iframe { position:absolute; inset:0; width:100%; height:100%; border:none; }
+.video-preview-placeholder { text-align:center; color:var(--muted); font-size:0.82rem; }
+
+/* SNS LINKS */
+.sns-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 0; border-bottom:1px solid var(--border);
+}
+.sns-item:last-child { border-bottom:none; }
+.sns-icon {
+  width:36px; height:36px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem; flex-shrink:0;
+}
+.sns-item input { flex:1; }
+
+/* SAVE BUTTON */
+.save-btn {
+  width:100%; padding:14px;
+  background:linear-gradient(135deg, var(--blue), #1a4fa0);
+  color:#fff; border:none; border-radius:var(--radius);
+  font-size:1rem; font-weight:900; cursor:pointer;
+  font-family:inherit; margin-top:8px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:opacity 0.2s;
+}
+.save-btn:active { opacity:0.8; }
+.save-btn.saved { background:var(--green); }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+  background:var(--green); color:#fff;
+  padding:10px 20px; border-radius:20px;
+  font-size:0.85rem; font-weight:700;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.3s;
+  z-index:999; white-space:nowrap;
+}
+.toast.show { opacity:1; }
+
+/* PREVIEW MODAL */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,0.8); backdrop-filter:blur(4px);
+}
+.modal-overlay.open { display:flex; align-items:center; justify-content:center; }
+.modal {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:16px; padding:24px;
+  max-width:360px; width:90%; text-align:center;
+}
+.modal h3 { font-size:1rem; margin-bottom:12px; }
+.modal p { font-size:0.82rem; color:var(--muted); line-height:1.6; margin-bottom:16px; }
+.modal-close {
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--text); padding:10px 20px; border-radius:8px;
+  cursor:pointer; font-family:inherit; font-size:0.85rem; width:100%;
+}
+
+/* COLOR PICKER */
+.color-row { display:flex; gap:10px; align-items:center; }
+.color-row input[type=color] {
+  width:48px; height:40px; border-radius:8px;
+  border:1px solid var(--border); cursor:pointer;
+  background:var(--bg3); padding:2px;
+}
+.color-presets { display:flex; gap:6px; flex-wrap:wrap; }
+.color-preset {
+  width:28px; height:28px; border-radius:50%;
+  border:2px solid transparent; cursor:pointer;
+  transition:transform 0.2s;
+}
+.color-preset:hover { transform:scale(1.2); }
+.color-preset.selected { border-color:#fff; }
+
+/* SECTION ORDER */
+.order-item {
+  display:flex; align-items:center; gap:12px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:12px; margin-bottom:8px;
+  cursor:grab;
+}
+.order-handle { color:var(--muted); font-size:1.2rem; }
+.order-name { font-size:0.85rem; font-weight:700; flex:1; }
+</style>
+</head>
+<body>
+
+<header class="admin-header">
+  <div class="admin-logo">
+    ⚙️ 배관사무소 관리자
+    <span class="admin-logo-badge">ADMIN</span>
+  </div>
+  <button class="preview-btn" onclick="openPreview()">👁 홈페이지 보기</button>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('basic')">📋 기본 정보</button>
+  <button class="tab" onclick="switchTab('contact')">📞 연락처</button>
+  <button class="tab" onclick="switchTab('text')">✏️ 문구</button>
+  <button class="tab" onclick="switchTab('media')">📸 사진·영상</button>
+  <button class="tab" onclick="switchTab('sns')">🔗 SNS·링크</button>
+  <button class="tab" onclick="switchTab('design')">🎨 디자인</button>
+</div>
+
+<!-- PANEL: 기본 정보 -->
+<div class="panel active" id="panel-basic">
+  <div class="card">
+    <div class="card-title">🏢 업체 기본 정보</div>
+    <div class="field">
+      <label>업체명</label>
+      <input type="text" id="bizName" value="배관사무소" placeholder="업체명 입력">
+    </div>
+    <div class="field">
+      <label>업체 슬로건 (짧은 한줄 소개)</label>
+      <input type="text" id="bizSlogan" value="막힘·누수·수전교체 전문" placeholder="예: 막힘·누수·수전교체 전문">
+    </div>
+    <div class="field">
+      <label>영업 지역</label>
+      <input type="text" id="bizArea" value="서울·경기 전 지역" placeholder="예: 서울·경기 전 지역">
+    </div>
+    <div class="field">
+      <label>영업 시간</label>
+      <input type="text" id="bizHours" value="24시간 365일 연중무휴" placeholder="예: 24시간 365일 연중무휴">
+    </div>
+    <div class="field">
+      <label>누적 시공 건수</label>
+      <input type="text" id="statCount" value="2,000+" placeholder="예: 2,000+">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">✅ 표시 항목 설정</div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">고객 후기 섹션</div>
+        <div class="toggle-sub">후기 카드를 홈페이지에 표시</div>
+      </div>
+      <div class="toggle on" id="toggle-reviews" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">장비 현황 섹션</div>
+        <div class="toggle-sub">보유 장비 목록 표시</div>
+      </div>
+      <div class="toggle on" id="toggle-equipment" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">영상 섹션</div>
+        <div class="toggle-sub">유튜브/틱톡 영상 표시</div>
+      </div>
+      <div class="toggle on" id="toggle-video" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">사진 갤러리 섹션</div>
+        <div class="toggle-sub">시공 사진 갤러리 표시</div>
+      </div>
+      <div class="toggle on" id="toggle-gallery" onclick="toggleSwitch(this)"></div>
+    </div>
+  </div>
+  <button class="save-btn" onclick="saveAll(this)">💾 저장하기</button>
+</div>
+
+<!-- PANEL: 연락처 -->
+<div class="panel" id="panel-contact">
+  <div class="card">
+    <div class="card-title">📞 전화번호</div>
+    <div class="field">
+      <label>대표 전화번호 (숫자만 또는 하이픈 포함)</label>
+      <input type="tel" id="phone" value="010-3782-0301" placeholder="010-0000-0000">
+      <div class="field-hint">📱 클릭 시 아이폰·안드로이드에서 바로 전화 연결됩니다</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💬 카카오톡</div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">카카오톡 버튼 표시</div>
+        <div class="toggle-sub">카카오 채널 또는 오픈채팅 연결</div>
+      </div>
+      <div class="toggle on" id="toggle-kakao" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>카카오톡 채널 URL</label>
+      <input type="url" id="kakaoUrl" value="" placeholder="https://pf.kakao.com/채널주소">
+      <div class="field-hint">카카오채널 관리자센터에서 URL 복사 후 붙여넣기.<br>없으면 비워두면 전화번호 문자 채팅으로 연결됩니다.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💌 문자(SMS)</div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">문자 버튼 표시</div>
+        <div class="toggle-sub">클릭 시 문자 앱 바로 열림</div>
+      </div>
+      <div class="toggle on" id="toggle-sms" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>문자 자동 입력 문구 (선택)</label>
+      <input type="text" id="smsText" value="안녕하세요, 배관 문의드립니다." placeholder="문자 보낼 때 자동으로 입력될 문구">
+    </div>
+  </div>
+
+  <button class="save-btn" onclick="saveAll(this)">💾 저장하기</button>
+</div>
+
+<!-- PANEL: 문구 -->
+<div class="panel" id="panel-text">
+  <div class="card">
+    <div class="card-title">🦸 히어로 문구 (첫 화면)</div>
+    <div class="field">
+      <label>메인 강조 문구 (파란색으로 표시)</label>
+      <input type="text" id="heroTitle1" value="막힌 곳, 새는 곳" placeholder="강조 문구">
+    </div>
+    <div class="field">
+      <label>메인 부제목</label>
+      <input type="text" id="heroTitle2" value="오늘 바로 해결합니다." placeholder="부제목">
+    </div>
+    <div class="field">
+      <label>설명 문구</label>
+      <textarea id="heroDesc">하수구 · 변기 · 싱크대 막힘부터
+누수 탐지 · 수전교체까지
+배관사무소가 신속하게 출동합니다.</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏷 뱃지 문구 (첫 화면 상단 태그)</div>
+    <div class="field">
+      <label>뱃지 1</label>
+      <input type="text" id="badge1" value="⚡ 24시간 출동">
+    </div>
+    <div class="field">
+      <label>뱃지 2</label>
+      <input type="text" id="badge2" value="✅ 당일 해결">
+    </div>
+    <div class="field">
+      <label>뱃지 3</label>
+      <input type="text" id="badge3" value="🔒 사후 AS 보장">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💬 고객 후기 (최대 3개)</div>
+    <div id="reviews-editor">
+      <div class="field" style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:10px">
+        <div style="font-size:0.75rem;color:var(--blue);font-weight:700;margin-bottom:8px">후기 1</div>
+        <div class="field"><label>작성자</label><input type="text" class="rv-name" value="김*영 고객님"></div>
+        <div class="field"><label>내용</label><textarea class="rv-text">새벽에 변기가 막혀서 급하게 연락했는데 빠르게 와주셔서 너무 감사했어요. 깔끔하게 처리해주시고 설명도 친절하게 해주셨습니다.</textarea></div>
+        <div class="field"><label>위치/유형</label><input type="text" class="rv-loc" value="아파트 거주"></div>
+      </div>
+      <div class="field" style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:10px">
+        <div style="font-size:0.75rem;color:var(--blue);font-weight:700;margin-bottom:8px">후기 2</div>
+        <div class="field"><label>작성자</label><input type="text" class="rv-name" value="이*준 고객님"></div>
+        <div class="field"><label>내용</label><textarea class="rv-text">싱크대 밑에서 물이 새서 연락했더니 당일 바로 오셔서 수전 교체까지 해주셨어요. 가격도 합리적이고 작업도 꼼꼼합니다.</textarea></div>
+        <div class="field"><label>위치/유형</label><input type="text" class="rv-loc" value="빌라 거주"></div>
+      </div>
+      <div class="field" style="background:var(--bg3);border-radius:8px;padding:14px">
+        <div style="font-size:0.75rem;color:var(--blue);font-weight:700;margin-bottom:8px">후기 3</div>
+        <div class="field"><label>작성자</label><input type="text" class="rv-name" value="박*수 고객님"></div>
+        <div class="field"><label>내용</label><textarea class="rv-text">화장실 하수구 냄새가 심해서 불렀는데 내시경으로 원인을 바로 찾아서 해결해주셨어요. 전문 장비가 확실히 다르네요.</textarea></div>
+        <div class="field"><label>위치/유형</label><input type="text" class="rv-loc" value="오피스텔 거주"></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="save-btn" onclick="saveAll(this)">💾 저장하기</button>
+</div>
+
+<!-- PANEL: 사진·영상 -->
+<div class="panel" id="panel-media">
+  <div class="card">
+    <div class="card-title">📸 시공 사진 갤러리</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      각 칸을 눌러 사진을 업로드하세요. Before/After 세트로 올리면 효과적입니다.
+    </p>
+    <div class="photo-grid" id="photo-grid">
+      <!-- slots generated by JS -->
+    </div>
+    <div style="font-size:0.72rem;color:var(--muted);line-height:1.6">
+      💡 JPG, PNG, WEBP 모두 가능. 파일 크기는 10MB 이하 권장.<br>
+      📐 정사각형 또는 4:3 비율 사진이 가장 보기 좋습니다.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🎬 영상 링크 (유튜브 / 틱톡 / 인스타그램)</div>
+    <div id="video-list">
+      <div class="field video-entry" style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:10px">
+        <div style="font-size:0.75rem;color:var(--blue);font-weight:700;margin-bottom:8px">영상 1 (메인)</div>
+        <label>영상 제목</label>
+        <input type="text" class="vid-title" value="배관 막힘 해결 과정" placeholder="영상 제목" style="margin-bottom:8px">
+        <label>유튜브/틱톡 URL</label>
+        <input type="url" class="vid-url" placeholder="https://www.youtube.com/watch?v=..." oninput="previewVideo(this)">
+        <div class="video-preview" style="margin-top:10px">
+          <div class="video-preview-placeholder">▶ URL 입력 시 미리보기가 나타납니다</div>
+        </div>
+      </div>
+      <div class="field video-entry" style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:10px">
+        <div style="font-size:0.75rem;color:var(--blue);font-weight:700;margin-bottom:8px">영상 2</div>
+        <label>영상 제목</label>
+        <input type="text" class="vid-title" value="" placeholder="영상 제목" style="margin-bottom:8px">
+        <label>유튜브/틱톡 URL</label>
+        <input type="url" class="vid-url" placeholder="https://www.youtube.com/watch?v=..." oninput="previewVideo(this)">
+        <div class="video-preview" style="margin-top:10px">
+          <div class="video-preview-placeholder">▶ URL 입력 시 미리보기가 나타납니다</div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:0.72rem;color:var(--muted);line-height:1.6;margin-top:4px">
+      ✅ 지원: 유튜브, 유튜브 쇼츠, 틱톡<br>
+      📋 URL 복사 방법: 유튜브 → 공유 → 링크 복사 / 틱톡 → 공유 → 링크 복사
+    </div>
+  </div>
+
+  <button class="save-btn" onclick="saveAll(this)">💾 저장하기</button>
+</div>
+
+<!-- PANEL: SNS·링크 -->
+<div class="panel" id="panel-sns">
+  <div class="card">
+    <div class="card-title">🔗 SNS 및 외부 링크</div>
+
+    <div class="sns-item">
+      <div class="sns-icon" style="background:#FEE500;color:#000">🐤</div>
+      <div style="flex:1">
+        <label style="margin-bottom:4px">카카오톡 채널</label>
+        <input type="url" id="sns-kakao" placeholder="https://pf.kakao.com/...">
+      </div>
+    </div>
+
+    <div class="sns-item">
+      <div class="sns-icon" style="background:#FF0000;color:#fff">▶</div>
+      <div style="flex:1">
+        <label style="margin-bottom:4px">유튜브 채널</label>
+        <input type="url" id="sns-youtube" placeholder="https://youtube.com/@채널명">
+      </div>
+    </div>
+
+    <div class="sns-item">
+      <div class="sns-icon" style="background:#000;color:#fff" style="font-size:1rem">♪</div>
+      <div style="flex:1">
+        <label style="margin-bottom:4px">틱톡</label>
+        <input type="url" id="sns-tiktok" placeholder="https://tiktok.com/@계정명">
+      </div>
+    </div>
+
+    <div class="sns-item">
+      <div class="sns-icon" style="background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff">📸</div>
+      <div style="flex:1">
+        <label style="margin-bottom:4px">인스타그램</label>
+        <input type="url" id="sns-insta" placeholder="https://instagram.com/계정명">
+      </div>
+    </div>
+
+    <div class="sns-item">
+      <div class="sns-icon" style="background:#03C75A;color:#fff">N</div>
+      <div style="flex:1">
+        <label style="margin-bottom:4px">네이버 블로그/플레이스</label>
+        <input type="url" id="sns-naver" placeholder="https://blog.naver.com/...">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📍 지도 / 위치</div>
+    <div class="field">
+      <label>네이버 지도 또는 카카오맵 URL</label>
+      <input type="url" id="mapUrl" placeholder="https://map.naver.com/... 또는 https://map.kakao.com/...">
+      <div class="field-hint">네이버지도에서 업체 검색 후 → 공유 → 링크 복사</div>
+    </div>
+  </div>
+
+  <button class="save-btn" onclick="saveAll(this)">💾 저장하기</button>
+</div>
+
+<!-- PANEL: 디자인 -->
+<div class="panel" id="panel-design">
+  <div class="card">
+    <div class="card-title">🎨 테마 색상</div>
+    <div class="field">
+      <label>메인 색상 (파란색 계열 추천)</label>
+      <div class="color-row">
+        <input type="color" id="colorMain" value="#2f7be8" oninput="updateColorPreview()">
+        <div class="color-presets">
+          <div class="color-preset selected" style="background:#2f7be8" onclick="setColor('#2f7be8')" title="파란색"></div>
+          <div class="color-preset" style="background:#0ea5e9" onclick="setColor('#0ea5e9')" title="하늘색"></div>
+          <div class="color-preset" style="background:#1a4fa0" onclick="setColor('#1a4fa0')" title="진파랑"></div>
+          <div class="color-preset" style="background:#16a34a" onclick="setColor('#16a34a')" title="초록"></div>
+          <div class="color-preset" style="background:#dc2626" onclick="setColor('#dc2626')" title="빨강"></div>
+          <div class="color-preset" style="background:#7c3aed" onclick="setColor('#7c3aed')" title="보라"></div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>강조 색상 (버튼 등)</label>
+      <div class="color-row">
+        <input type="color" id="colorAccent" value="#f0a500" oninput="updateColorPreview()">
+        <div class="color-presets">
+          <div class="color-preset selected" style="background:#f0a500" onclick="setAccentColor('#f0a500')" title="황금"></div>
+          <div class="color-preset" style="background:#f97316" onclick="setAccentColor('#f97316')" title="주황"></div>
+          <div class="color-preset" style="background:#ef4444" onclick="setAccentColor('#ef4444')" title="빨강"></div>
+          <div class="color-preset" style="background:#22c55e" onclick="setAccentColor('#22c55e')" title="초록"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📱 하단 고정 버튼 설정</div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">전화 버튼</div>
+        <div class="toggle-sub">하단 고정 바에 전화 버튼 표시</div>
+      </div>
+      <div class="toggle on" id="toggle-btn-phone" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">카카오톡 버튼</div>
+        <div class="toggle-sub">하단 고정 바에 카카오 버튼 표시</div>
+      </div>
+      <div class="toggle on" id="toggle-btn-kakao" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">문자 버튼</div>
+        <div class="toggle-sub">하단 고정 바에 문자 버튼 표시</div>
+      </div>
+      <div class="toggle on" id="toggle-btn-sms" onclick="toggleSwitch(this)"></div>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">하단 바 진동 애니메이션</div>
+        <div class="toggle-sub">전화 아이콘 흔들림 효과</div>
+      </div>
+      <div class="toggle on" id="toggle-shake" onclick="toggleSwitch(this)"></div>
+    </div>
+  </div>
+
+  <button class="save-btn" onclick="saveAll(this)">💾 저장하기</button>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">✅ 저장됐습니다!</div>
+
+<!-- PREVIEW MODAL -->
+<div class="modal-overlay" id="previewModal">
+  <div class="modal">
+    <h3>👁 홈페이지 미리보기</h3>
+    <p>
+      설정을 저장하면 <strong style="color:#388bfd">index.html</strong> 파일에 자동 반영됩니다.<br><br>
+      아래 버튼으로 홈페이지를 열어 확인하세요.
+    </p>
+    <button class="preview-btn" style="width:100%;margin-bottom:10px;justify-content:center" onclick="generateAndPreview()">🚀 홈페이지 생성하기</button>
+    <button class="modal-close" onclick="closePreview()">닫기</button>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
+
+<script>
+// ── STATE ──
+let currentSlot = null;
+const photoData = new Array(6).fill(null); // base64 or null
+
+// ── TABS ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ── TOGGLE ──
+function toggleSwitch(el) {
+  el.classList.toggle('on');
+}
+
+// ── PHOTO SLOTS ──
+function initPhotoGrid() {
+  const grid = document.getElementById('photo-grid');
+  const labels = ['하수구 전', '하수구 후', '변기 전', '변기 후', '누수 수리', '수전 교체'];
+  grid.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'photo-slot';
+    slot.dataset.index = i;
+    slot.innerHTML = `
+      <div class="slot-icon">📷</div>
+      <div class="slot-label">${labels[i]}</div>
+      <button class="remove-btn" onclick="removePhoto(event,${i})">✕</button>
+    `;
+    slot.onclick = () => openFilePicker(i);
+    grid.appendChild(slot);
+  }
+}
+
+function openFilePicker(index) {
+  currentSlot = index;
+  document.getElementById('file-input').click();
+}
+
+function handlePhotoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    photoData[currentSlot] = ev.target.result;
+    updatePhotoSlot(currentSlot);
+    e.target.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function updatePhotoSlot(index) {
+  const slots = document.querySelectorAll('.photo-slot');
+  const slot = slots[index];
+  const labels = ['하수구 전', '하수구 후', '변기 전', '변기 후', '누수 수리', '수전 교체'];
+  if (photoData[index]) {
+    slot.innerHTML = `
+      <img src="${photoData[index]}" alt="시공사진 ${index+1}">
+      <button class="remove-btn" onclick="removePhoto(event,${index})">✕</button>
+    `;
+  } else {
+    slot.innerHTML = `
+      <div class="slot-icon">📷</div>
+      <div class="slot-label">${labels[index]}</div>
+      <button class="remove-btn" onclick="removePhoto(event,${index})">✕</button>
+    `;
+  }
+}
+
+function removePhoto(e, index) {
+  e.stopPropagation();
+  photoData[index] = null;
+  updatePhotoSlot(index);
+}
+
+// ── VIDEO PREVIEW ──
+function previewVideo(input) {
+  const url = input.value.trim();
+  const container = input.closest('.video-entry').querySelector('.video-preview');
+  const embedUrl = getEmbedUrl(url);
+  if (embedUrl) {
+    container.innerHTML = `<iframe src="${embedUrl}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
+  } else {
+    container.innerHTML = `<div class="video-preview-placeholder">▶ URL 입력 시 미리보기가 나타납니다</div>`;
+  }
+}
+
+function getEmbedUrl(url) {
+  if (!url) return null;
+  // YouTube
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  // TikTok
+  const ttMatch = url.match(/tiktok\.com\/@[\w.]+\/video\/(\d+)/);
+  if (ttMatch) return `https://www.tiktok.com/embed/v2/${ttMatch[1]}`;
+  return null;
+}
+
+// ── COLOR ──
+function setColor(hex) {
+  document.getElementById('colorMain').value = hex;
+  document.querySelectorAll('.color-presets').forEach((g, gi) => {
+    if (gi === 0) g.querySelectorAll('.color-preset').forEach(p => {
+      p.classList.toggle('selected', p.style.background === hex);
+    });
+  });
+}
+function setAccentColor(hex) {
+  document.getElementById('colorAccent').value = hex;
+}
+function updateColorPreview() {}
+
+// ── SAVE ──
+function saveAll(btn) {
+  // Gather all settings
+  const settings = gatherSettings();
+  localStorage.setItem('baegwan_settings', JSON.stringify(settings));
+  localStorage.setItem('baegwan_photos', JSON.stringify(photoData));
+
+  // Update button
+  btn.textContent = '✅ 저장됐습니다!';
+  btn.classList.add('saved');
+  setTimeout(() => {
+    btn.textContent = '💾 저장하기';
+    btn.classList.remove('saved');
+  }, 2000);
+
+  const toast = document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+function gatherSettings() {
+  const reviews = [];
+  document.querySelectorAll('#reviews-editor > div').forEach(block => {
+    reviews.push({
+      name: block.querySelector('.rv-name').value,
+      text: block.querySelector('.rv-text').value,
+      loc: block.querySelector('.rv-loc').value,
+    });
+  });
+
+  const videos = [];
+  document.querySelectorAll('.video-entry').forEach(entry => {
+    videos.push({
+      title: entry.querySelector('.vid-title').value,
+      url: entry.querySelector('.vid-url').value,
+    });
+  });
+
+  return {
+    bizName: v('bizName'), bizSlogan: v('bizSlogan'),
+    bizArea: v('bizArea'), bizHours: v('bizHours'), statCount: v('statCount'),
+    phone: v('phone'), kakaoUrl: v('kakaoUrl'), smsText: v('smsText'),
+    heroTitle1: v('heroTitle1'), heroTitle2: v('heroTitle2'), heroDesc: v('heroDesc'),
+    badge1: v('badge1'), badge2: v('badge2'), badge3: v('badge3'),
+    snsKakao: v('sns-kakao'), snsYoutube: v('sns-youtube'),
+    snsTiktok: v('sns-tiktok'), snsInsta: v('sns-insta'), snsNaver: v('sns-naver'),
+    mapUrl: v('mapUrl'),
+    colorMain: v('colorMain'), colorAccent: v('colorAccent'),
+    showReviews: isOn('toggle-reviews'), showEquipment: isOn('toggle-equipment'),
+    showVideo: isOn('toggle-video'), showGallery: isOn('toggle-gallery'),
+    showKakao: isOn('toggle-kakao'), showSms: isOn('toggle-sms'),
+    btnPhone: isOn('toggle-btn-phone'), btnKakao: isOn('toggle-btn-kakao'),
+    btnSms: isOn('toggle-btn-sms'), shake: isOn('toggle-shake'),
+    reviews, videos,
+  };
+}
+
+function v(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+function isOn(id) { const el = document.getElementById(id); return el ? el.classList.contains('on') : false; }
+
+// ── PREVIEW / GENERATE ──
+function openPreview() {
+  document.getElementById('previewModal').classList.add('open');
+}
+function closePreview() {
+  document.getElementById('previewModal').classList.remove('open');
+}
+
+function generateAndPreview() {
+  saveAll(document.querySelector('.save-btn'));
+  const settings = gatherSettings();
+  const photos = JSON.parse(localStorage.getItem('baegwan_photos') || '[]');
+  const html = buildHTML(settings, photos);
+  const blob = new Blob([html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  closePreview();
+}
+
+// ── LOAD ON START ──
+function loadSettings() {
+  const raw = localStorage.getItem('baegwan_settings');
+  if (!raw) return;
+  const s = JSON.parse(raw);
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+  set('bizName', s.bizName); set('bizSlogan', s.bizSlogan);
+  set('bizArea', s.bizArea); set('bizHours', s.bizHours); set('statCount', s.statCount);
+  set('phone', s.phone); set('kakaoUrl', s.kakaoUrl); set('smsText', s.smsText);
+  set('heroTitle1', s.heroTitle1); set('heroTitle2', s.heroTitle2); set('heroDesc', s.heroDesc);
+  set('badge1', s.badge1); set('badge2', s.badge2); set('badge3', s.badge3);
+  set('sns-kakao', s.snsKakao); set('sns-youtube', s.snsYoutube);
+  set('sns-tiktok', s.snsTiktok); set('sns-insta', s.snsInsta); set('sns-naver', s.snsNaver);
+  set('mapUrl', s.mapUrl);
+  set('colorMain', s.colorMain); set('colorAccent', s.colorAccent);
+
+  const setToggle = (id, val) => { const el = document.getElementById(id); if (el) { el.classList.toggle('on', !!val); } };
+  setToggle('toggle-reviews', s.showReviews); setToggle('toggle-equipment', s.showEquipment);
+  setToggle('toggle-video', s.showVideo); setToggle('toggle-gallery', s.showGallery);
+  setToggle('toggle-kakao', s.showKakao); setToggle('toggle-sms', s.showSms);
+  setToggle('toggle-btn-phone', s.btnPhone); setToggle('toggle-btn-kakao', s.btnKakao);
+  setToggle('toggle-btn-sms', s.btnSms); setToggle('toggle-shake', s.shake);
+
+  if (s.reviews) {
+    const blocks = document.querySelectorAll('#reviews-editor > div');
+    s.reviews.forEach((rv, i) => {
+      if (blocks[i]) {
+        blocks[i].querySelector('.rv-name').value = rv.name || '';
+        blocks[i].querySelector('.rv-text').value = rv.text || '';
+        blocks[i].querySelector('.rv-loc').value = rv.loc || '';
+      }
+    });
+  }
+  if (s.videos) {
+    const entries = document.querySelectorAll('.video-entry');
+    s.videos.forEach((vid, i) => {
+      if (entries[i]) {
+        entries[i].querySelector('.vid-title').value = vid.title || '';
+        entries[i].querySelector('.vid-url').value = vid.url || '';
+        if (vid.url) previewVideo(entries[i].querySelector('.vid-url'));
+      }
+    });
+  }
+}
+
+function loadPhotos() {
+  const raw = localStorage.getItem('baegwan_photos');
+  if (!raw) return;
+  const saved = JSON.parse(raw);
+  saved.forEach((d, i) => { if (d) { photoData[i] = d; updatePhotoSlot(i); } });
+}
+
+// ── BUILD HTML ──
+function buildHTML(s, photos) {
+  const phoneRaw = (s.phone || '010-3782-0301').replace(/-/g, '');
+  const phone = s.phone || '010-3782-0301';
+  const cm = s.colorMain || '#2f7be8';
+  const ca = s.colorAccent || '#f0a500';
+
+  // Gallery photos
+  const galleryItems = photos.map((p, i) => {
+    const labels = ['하수구 전', '하수구 후', '변기 전', '변기 후', '누수 수리', '수전 교체'];
+    if (p) {
+      return `<div class="gallery-item ${i===4?'wide':''}"><img src="${p}" alt="${labels[i]}" style="width:100%;height:100%;object-fit:cover;border-radius:10px"><div class="gallery-tag">${labels[i]}</div></div>`;
+    }
+    return `<div class="gallery-item ${i===4?'wide':''}"><div class="gallery-placeholder-icon">📷</div><div class="gallery-tag">${labels[i]}</div><div class="gallery-placeholder-text">사진 준비중</div></div>`;
+  }).join('');
+
+  // Videos
+  const videoSections = (s.videos || []).filter(v => v.url).map(vid => {
+    const embedUrl = getEmbedUrl(vid.url);
+    if (!embedUrl) return '';
+    return `
+    <div style="margin-bottom:16px">
+      <div style="font-size:0.9rem;font-weight:700;margin-bottom:8px;color:var(--blue-glow)">${vid.title || '시공 영상'}</div>
+      <div style="position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#0a1628">
+        <iframe src="${embedUrl}" style="position:absolute;inset:0;width:100%;height:100%;border:none" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+      </div>
+    </div>`;
+  }).join('');
+
+  // SNS links
+  const snsLinks = [];
+  if (s.snsYoutube) snsLinks.push(`<a href="${s.snsYoutube}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px;background:rgba(255,0,0,0.1);border:1px solid rgba(255,0,0,0.2);border-radius:10px;color:#ff4444;text-decoration:none;font-size:0.85rem;font-weight:700">▶ 유튜브 채널 보기</a>`);
+  if (s.snsTiktok) snsLinks.push(`<a href="${s.snsTiktok}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;text-decoration:none;font-size:0.85rem;font-weight:700">♪ 틱톡 보기</a>`);
+  if (s.snsInsta) snsLinks.push(`<a href="${s.snsInsta}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px;background:rgba(225,48,108,0.1);border:1px solid rgba(225,48,108,0.2);border-radius:10px;color:#e1306c;text-decoration:none;font-size:0.85rem;font-weight:700">📸 인스타그램 보기</a>`);
+  if (s.snsNaver) snsLinks.push(`<a href="${s.snsNaver}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px;background:rgba(3,199,90,0.1);border:1px solid rgba(3,199,90,0.2);border-radius:10px;color:#03C75A;text-decoration:none;font-size:0.85rem;font-weight:700">N 네이버 블로그/플레이스</a>`);
+
+  // Reviews
+  const reviews = (s.reviews || []).map(rv => `
+    <div class="review-card">
+      <div class="review-header">
+        <span class="reviewer">${rv.name}</span>
+      </div>
+      <div class="stars">★★★★★</div>
+      <p class="review-text">${rv.text}</p>
+      <div class="review-location">📍 ${rv.loc}</div>
+    </div>`).join('');
+
+  // Bottom bar buttons
+  const kakaoHref = s.kakaoUrl ? s.kakaoUrl : `sms:${phoneRaw}`;
+  const smsHref = `sms:${phoneRaw}${s.smsText ? `?body=${encodeURIComponent(s.smsText)}` : ''}`;
+
+  const bottomBtns = [];
+  if (s.btnPhone !== false) bottomBtns.push(`
+    <a href="tel:${phoneRaw}" class="bottom-btn phone-btn">
+      <span class="bottom-icon ${s.shake!==false?'shake':''}">📞</span>
+      <span class="bottom-label">전화</span>
+    </a>`);
+  if (s.btnKakao !== false) bottomBtns.push(`
+    <a href="${kakaoHref}" class="bottom-btn kakao-btn">
+      <span class="bottom-icon">🐤</span>
+      <span class="bottom-label">카카오톡</span>
+    </a>`);
+  if (s.btnSms !== false) bottomBtns.push(`
+    <a href="${smsHref}" class="bottom-btn sms-btn">
+      <span class="bottom-icon">💬</span>
+      <span class="bottom-label">문자</span>
+    </a>`);
+
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${s.bizName || '배관사무소'} — ${s.bizSlogan || '배관 전문'}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue-deep:#0a1628; --blue-mid:#0d2b5e;
+  --blue-brand:${cm}; --blue-bright:${cm};
+  --blue-light:#5ba3f5; --blue-glow:#7ec8ff;
+  --accent:${ca}; --accent-light:${ca}dd;
+  --white:#fff; --gray-200:#d8e3f2; --gray-500:#7a94b8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--blue-deep);color:#fff;overflow-x:hidden}
+
+/* TOP BAR */
+.top-bar{position:fixed;top:0;left:0;right:0;z-index:998;background:rgba(10,22,40,0.95);backdrop-filter:blur(10px);border-bottom:1px solid rgba(47,123,232,0.3);padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:'Oswald',sans-serif;font-size:1.2rem;letter-spacing:2px;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+.top-call-btn{background:var(--blue-bright);color:#fff;border:none;padding:8px 16px;border-radius:20px;font-size:.8rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:6px}
+
+/* HERO */
+.hero{position:relative;min-height:88vh;display:flex;flex-direction:column;justify-content:center;padding:40px 24px 60px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 30%,rgba(47,123,232,.2) 0%,transparent 70%),linear-gradient(180deg,#0a1628 0%,#0d2b5e 60%,#0a1628 100%)}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(47,123,232,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(47,123,232,.07) 1px,transparent 1px);background-size:32px 32px}
+.hero-content{position:relative;z-index:1}
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid}
+.badge-blue{background:rgba(47,123,232,.15);border-color:rgba(47,123,232,.5);color:var(--blue-glow)}
+.badge-gold{background:rgba(240,165,0,.15);border-color:rgba(240,165,0,.5);color:var(--accent-light)}
+.hero h1{font-size:2rem;font-weight:900;line-height:1.25;margin-bottom:16px}
+.hero h1 .highlight{color:var(--blue-glow);display:block}
+.hero-desc{font-size:.9rem;line-height:1.7;color:var(--gray-200);margin-bottom:28px;white-space:pre-line}
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(47,123,232,.2);border:1px solid rgba(47,123,232,.2);border-radius:12px;overflow:hidden;margin-bottom:28px}
+.stat-item{background:rgba(13,43,94,.6);padding:14px 8px;text-align:center}
+.stat-num{font-family:'Oswald',sans-serif;font-size:1.5rem;color:var(--accent-light);line-height:1}
+.stat-label{font-size:.68rem;color:var(--gray-500);margin-top:4px}
+.hero-cta{display:flex;flex-direction:column;gap:10px}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,var(--blue-bright),var(--blue-brand));color:#fff;text-decoration:none;padding:16px 24px;border-radius:12px;font-size:1rem;font-weight:900;box-shadow:0 8px 32px rgba(47,123,232,.4);border:1px solid rgba(126,200,255,.3)}
+.btn-secondary{display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:var(--blue-glow);text-decoration:none;padding:14px 24px;border-radius:12px;font-size:.9rem;font-weight:700;border:1px solid rgba(47,123,232,.4)}
+
+/* SECTIONS */
+section{padding:48px 24px}
+.section-label{font-size:.72rem;font-weight:700;letter-spacing:3px;color:var(--blue-light);text-transform:uppercase;margin-bottom:8px}
+.section-title{font-size:1.5rem;font-weight:900;line-height:1.3;margin-bottom:6px}
+.section-sub{font-size:.85rem;color:var(--gray-500);margin-bottom:28px;line-height:1.6}
+.divider{width:40px;height:3px;background:linear-gradient(90deg,var(--blue-bright),transparent);margin:12px 0 24px;border-radius:2px}
+
+/* SERVICES */
+.services-section{background:rgba(13,43,94,.3)}
+.services-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.service-card{background:rgba(10,22,40,.8);border:1px solid rgba(47,123,232,.2);border-radius:14px;padding:20px 16px;position:relative;overflow:hidden}
+.service-card.featured{grid-column:span 2;background:linear-gradient(135deg,rgba(26,79,160,.4),rgba(47,123,232,.15));border-color:rgba(47,123,232,.4)}
+.service-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue-bright),transparent)}
+.service-icon{font-size:2rem;margin-bottom:10px}
+.service-name{font-size:.95rem;font-weight:900;margin-bottom:4px}
+.service-desc{font-size:.75rem;color:var(--gray-500);line-height:1.5}
+.service-urgent{display:inline-block;margin-top:8px;font-size:.65rem;font-weight:700;color:var(--accent);background:rgba(240,165,0,.1);padding:2px 8px;border-radius:10px;border:1px solid rgba(240,165,0,.3)}
+
+/* WHY */
+.why-section{background:var(--blue-deep)}
+.why-list{display:flex;flex-direction:column;gap:16px}
+.why-item{display:flex;gap:16px;align-items:flex-start;background:rgba(13,43,94,.4);border:1px solid rgba(47,123,232,.15);border-radius:12px;padding:16px}
+.why-num{font-family:'Oswald',sans-serif;font-size:1.8rem;color:rgba(47,123,232,.25);line-height:1;min-width:32px}
+.why-text-title{font-size:.95rem;font-weight:900;margin-bottom:4px}
+.why-text-desc{font-size:.8rem;color:var(--gray-500);line-height:1.5}
+
+/* GALLERY */
+.gallery-section{background:rgba(13,43,94,.2)}
+.gallery-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gallery-item{border-radius:10px;overflow:hidden;background:rgba(13,43,94,.5);border:1px solid rgba(47,123,232,.15);aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;position:relative}
+.gallery-item.wide{grid-column:span 2;aspect-ratio:16/9}
+.gallery-placeholder-icon{font-size:2.5rem;opacity:.5}
+.gallery-placeholder-text{font-size:.72rem;color:var(--gray-500)}
+.gallery-tag{font-size:.65rem;font-weight:700;background:rgba(47,123,232,.2);color:var(--blue-light);padding:2px 8px;border-radius:10px;position:absolute;bottom:8px;left:8px}
+
+/* VIDEO */
+.video-section{background:var(--blue-deep)}
+
+/* REVIEWS */
+.reviews-section{background:rgba(13,43,94,.3)}
+.stars{color:var(--accent);font-size:1rem;margin-bottom:4px}
+.review-cards{display:flex;flex-direction:column;gap:12px}
+.review-card{background:rgba(10,22,40,.7);border:1px solid rgba(47,123,232,.15);border-radius:12px;padding:16px}
+.review-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.reviewer{font-size:.85rem;font-weight:700}
+.review-text{font-size:.82rem;color:var(--gray-200);line-height:1.6}
+.review-location{font-size:.72rem;color:var(--gray-500);margin-top:6px}
+
+/* EQUIPMENT */
+.equipment-section{background:var(--blue-deep)}
+.equipment-list{display:flex;flex-direction:column;gap:10px}
+.equipment-item{display:flex;align-items:center;gap:14px;background:rgba(13,43,94,.4);border:1px solid rgba(47,123,232,.15);border-radius:10px;padding:14px 16px}
+.equipment-icon{font-size:1.8rem;min-width:40px;text-align:center}
+.equipment-name{font-size:.9rem;font-weight:700}
+.equipment-desc{font-size:.75rem;color:var(--gray-500);margin-top:2px}
+.equipment-badge{margin-left:auto;font-size:.65rem;font-weight:700;background:rgba(47,123,232,.15);color:var(--blue-light);padding:4px 10px;border-radius:20px;white-space:nowrap;border:1px solid rgba(47,123,232,.3)}
+
+/* CONTACT */
+.contact-section{background:linear-gradient(180deg,rgba(13,43,94,.4) 0%,var(--blue-deep) 100%)}
+.contact-card{background:linear-gradient(135deg,rgba(26,79,160,.3),rgba(47,123,232,.1));border:1px solid rgba(47,123,232,.3);border-radius:16px;padding:28px 20px;text-align:center}
+.contact-name{font-family:'Oswald',sans-serif;font-size:1.8rem;letter-spacing:3px;margin-bottom:6px}
+.contact-tagline{font-size:.82rem;color:var(--gray-500);margin-bottom:24px}
+.contact-number{font-family:'Oswald',sans-serif;font-size:2rem;color:var(--accent-light);letter-spacing:2px;margin-bottom:20px}
+.contact-btns{display:flex;flex-direction:column;gap:10px}
+.contact-info-list{display:flex;flex-direction:column;gap:8px;margin-top:20px;text-align:left}
+.contact-info-item{display:flex;gap:10px;align-items:center;font-size:.82rem;color:var(--gray-200)}
+.contact-info-item span:first-child{color:var(--blue-light);font-size:1rem}
+.sns-link-grid{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+
+/* BOTTOM BAR */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;z-index:999;display:flex;background:#0a1628;border-top:1px solid rgba(47,123,232,.2);padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+.bottom-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;padding:6px 4px;border-right:1px solid rgba(255,255,255,.05)}
+.bottom-btn:last-child{border-right:none}
+.phone-btn{background:rgba(47,123,232,.15)}
+.kakao-btn{background:rgba(254,229,0,.1)}
+.sms-btn{background:rgba(63,185,80,.1)}
+.bottom-icon{font-size:1.4rem;display:block}
+.bottom-label{font-size:.62rem;font-weight:700;color:#ccc}
+.phone-btn .bottom-label{color:#7ec8ff}
+.kakao-btn .bottom-label{color:#FEE500}
+.sms-btn .bottom-label{color:#3fb950}
+
+@keyframes shake{0%,100%{transform:rotate(0)}10%{transform:rotate(-15deg)}20%{transform:rotate(15deg)}30%{transform:rotate(-10deg)}40%{transform:rotate(10deg)}50%{transform:rotate(0)}}
+.shake{animation:shake 2s ease-in-out infinite}
+
+footer{background:#050d1a;padding:24px;text-align:center;border-top:1px solid rgba(47,123,232,.1)}
+footer p{font-size:.72rem;color:var(--gray-500);line-height:1.8}
+
+main{padding-top:60px;padding-bottom:80px}
+.fade-in{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.fade-in.visible{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    ${s.bizName || '배관사무소'}
+  </div>
+  <a href="tel:${phoneRaw}" class="top-call-btn">📞 지금 전화</a>
+</header>
+
+<main>
+<section class="hero">
+  <div class="hero-bg"></div><div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="badge-row fade-in">
+      <span class="badge badge-gold">${s.badge1 || '⚡ 24시간 출동'}</span>
+      <span class="badge badge-blue">${s.badge2 || '✅ 당일 해결'}</span>
+      <span class="badge badge-blue">${s.badge3 || '🔒 사후 AS 보장'}</span>
+    </div>
+    <h1 class="fade-in">
+      <span class="highlight">${s.heroTitle1 || '막힌 곳, 새는 곳'}</span>
+      ${s.heroTitle2 || '오늘 바로 해결합니다.'}
+    </h1>
+    <p class="hero-desc fade-in">${s.heroDesc || ''}</p>
+    <div class="hero-stats fade-in">
+      <div class="stat-item"><div class="stat-num">${s.statCount || '2,000+'}</div><div class="stat-label">누적 시공</div></div>
+      <div class="stat-item"><div class="stat-num">24h</div><div class="stat-label">연중무휴</div></div>
+      <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">AS 보장</div></div>
+    </div>
+    <div class="hero-cta fade-in">
+      <a href="tel:${phoneRaw}" class="btn-primary">📞 ${phone} 전화하기</a>
+      <a href="#services" class="btn-secondary">서비스 항목 보기 ↓</a>
+    </div>
+  </div>
+</section>
+
+<section class="services-section fade-in" id="services">
+  <div class="section-label">Services</div>
+  <div class="section-title">전문 시공 서비스</div>
+  <div class="divider"></div>
+  <p class="section-sub">모든 배관 문제, 하나의 전화로 해결하세요</p>
+  <div class="services-grid">
+    <div class="service-card featured"><div class="service-icon">🚽</div><div class="service-name">변기 막힘 해결</div><div class="service-desc">뚫어뻥으로 안 될 때, 전문 장비로 완벽 해결. 하수관 내시경 포함.</div><span class="service-urgent">🔴 긴급 출동 가능</span></div>
+    <div class="service-card"><div class="service-icon">🏠</div><div class="service-name">하수구 막힘</div><div class="service-desc">욕실·베란다·주방 하수구 완전 뚫어드립니다.</div><span class="service-urgent">🔴 당일 처리</span></div>
+    <div class="service-card"><div class="service-icon">🍳</div><div class="service-name">싱크대 막힘</div><div class="service-desc">기름때·음식물 찌꺼기 등 주방 배관 세척.</div></div>
+    <div class="service-card"><div class="service-icon">💧</div><div class="service-name">누수 탐지·수리</div><div class="service-desc">벽·바닥 내부 누수까지 정밀 탐지 후 수리.</div><span class="service-urgent">⚠️ 긴급 출동</span></div>
+    <div class="service-card"><div class="service-icon">🔩</div><div class="service-name">수전·부속 교체</div><div class="service-desc">세면대·싱크대·욕조 수전 노후화 시 신속 교체.</div></div>
+    <div class="service-card"><div class="service-icon">🔍</div><div class="service-name">배관 내시경 점검</div><div class="service-desc">카메라로 내부 상태 확인 후 원인 정확히 진단.</div></div>
+  </div>
+</section>
+
+<section class="why-section fade-in">
+  <div class="section-label">Why Us</div>
+  <div class="section-title">왜 배관사무소인가요?</div>
+  <div class="divider"></div>
+  <div class="why-list">
+    <div class="why-item"><div class="why-num">01</div><div><div class="why-text-title">⚡ 빠른 출동, 당일 해결 원칙</div><div class="why-text-desc">연락 즉시 출동 준비. 대부분의 작업을 당일 완료합니다.</div></div></div>
+    <div class="why-item"><div class="why-num">02</div><div><div class="why-text-title">💰 현장 무료 견적, 숨겨진 비용 없음</div><div class="why-text-desc">작업 전 명확하게 금액을 안내드립니다. 추가 비용 청구 없습니다.</div></div></div>
+    <div class="why-item"><div class="why-num">03</div><div><div class="why-text-title">🔧 전문 장비 보유, 완벽한 마무리</div><div class="why-text-desc">고압 세척기, 내시경 카메라 등으로 원인을 정확히 파악합니다.</div></div></div>
+    <div class="why-item"><div class="why-num">04</div><div><div class="why-text-title">🛡 시공 후 AS 확실히 보장</div><div class="why-text-desc">작업 완료 후 문제가 재발하면 책임지고 다시 처리합니다.</div></div></div>
+    <div class="why-item"><div class="why-num">05</div><div><div class="why-text-title">📋 친절한 상담, 정직한 설명</div><div class="why-text-desc">문제 원인과 해결 방법을 알기 쉽게 설명드립니다.</div></div></div>
+  </div>
+</section>
+
+${s.showEquipment !== false ? `
+<section class="equipment-section fade-in">
+  <div class="section-label">Equipment</div>
+  <div class="section-title">보유 장비 현황</div>
+  <div class="divider"></div>
+  <div class="equipment-list">
+    <div class="equipment-item"><div class="equipment-icon">🎥</div><div><div class="equipment-name">배관 내시경 카메라</div><div class="equipment-desc">파이프 내부 실시간 영상 확인</div></div><div class="equipment-badge">정밀 진단</div></div>
+    <div class="equipment-item"><div class="equipment-icon">💥</div><div><div class="equipment-name">고압 세척기</div><div class="equipment-desc">강력한 수압으로 찌꺼기 완전 제거</div></div><div class="equipment-badge">강력 세척</div></div>
+    <div class="equipment-item"><div class="equipment-icon">🌀</div><div><div class="equipment-name">전동 스프링 기계</div><div class="equipment-desc">깊은 막힘도 회전력으로 완전 제거</div></div><div class="equipment-badge">심부 제거</div></div>
+    <div class="equipment-item"><div class="equipment-icon">🔍</div><div><div class="equipment-name">누수 탐지기</div><div class="equipment-desc">비파괴 방식으로 정밀 탐지</div></div><div class="equipment-badge">비파괴 탐지</div></div>
+    <div class="equipment-item"><div class="equipment-icon">🔧</div><div><div class="equipment-name">전문 배관 공구 세트</div><div class="equipment-desc">수전·부속 교체 현장 즉시 처리</div></div><div class="equipment-badge">즉시 처리</div></div>
+  </div>
+</section>` : ''}
+
+${s.showGallery !== false ? `
+<section class="gallery-section fade-in">
+  <div class="section-label">Gallery</div>
+  <div class="section-title">시공 사진</div>
+  <div class="divider"></div>
+  <div class="gallery-grid">${galleryItems}</div>
+</section>` : ''}
+
+${s.showVideo !== false && videoSections ? `
+<section class="video-section fade-in">
+  <div class="section-label">Video</div>
+  <div class="section-title">시공 영상</div>
+  <div class="divider"></div>
+  ${videoSections}
+</section>` : ''}
+
+${snsLinks.length > 0 ? `
+<section style="padding:32px 24px;background:rgba(13,43,94,.2)">
+  <div class="section-label">Follow</div>
+  <div class="section-title">SNS 채널</div>
+  <div class="divider"></div>
+  <div class="sns-link-grid">${snsLinks.join('')}</div>
+</section>` : ''}
+
+${s.showReviews !== false ? `
+<section class="reviews-section fade-in">
+  <div class="section-label">Reviews</div>
+  <div class="section-title">고객 후기</div>
+  <div class="divider"></div>
+  <div class="review-cards">${reviews}</div>
+</section>` : ''}
+
+<section class="contact-section fade-in" id="contact">
+  <div class="section-label">Contact</div>
+  <div class="section-title">지금 바로 연락하세요</div>
+  <div class="divider"></div>
+  <div class="contact-card">
+    <div class="contact-name">${s.bizName || '배관사무소'}</div>
+    <div class="contact-tagline">${s.bizSlogan || ''} / ${s.bizHours || '24시간 연중무휴'}</div>
+    <div class="contact-number">${phone}</div>
+    <div class="contact-btns">
+      <a href="tel:${phoneRaw}" class="btn-primary">📞 전화 연결하기</a>
+      ${s.showKakao !== false ? `<a href="${kakaoHref}" class="btn-secondary" style="background:rgba(254,229,0,.15);border-color:rgba(254,229,0,.4);color:#FEE500">🐤 카카오톡 문의</a>` : ''}
+      ${s.showSms !== false ? `<a href="${smsHref}" class="btn-secondary">💬 문자 보내기</a>` : ''}
+    </div>
+    <div class="contact-info-list">
+      <div class="contact-info-item"><span>⏰</span><span>${s.bizHours || '24시간 365일 연중무휴'}</span></div>
+      <div class="contact-info-item"><span>📍</span><span>${s.bizArea || '서울·경기 전 지역'}</span></div>
+      <div class="contact-info-item"><span>💰</span><span>현장 무료 견적 / 추가 비용 없음</span></div>
+      <div class="contact-info-item"><span>🛡</span><span>시공 후 AS 확실 보장</span></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <p><strong>${s.bizName || '배관사무소'}</strong><br>
+  ${s.bizSlogan || '하수구·변기·싱크대 막힘 | 누수 | 수전교체'}<br>
+  📞 ${phone} | ${s.bizHours || '24시간 연중무휴'}<br>
+  📍 ${s.bizArea || ''}</p>
+</footer>
+
+<div class="bottom-bar">
+  ${bottomBtns.join('')}
+</div>
+
+<script>
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+},{threshold:0.1});
+document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+<\/script>
+</body>
+</html>`;
+}
+
+// ── INIT ──
+initPhotoGrid();
+loadSettings();
+loadPhotos();
+</script>
+</body>
+</html>
