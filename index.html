@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>배관사무소</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Oswald:wght@700&display=swap" rel="stylesheet">
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadString, getDownloadURL, deleteObject }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB2l3qZSItgTelGd2ke3OQ9d7-xi3gGt1U",
+  authDomain: "baekan-web.firebaseapp.com",
+  projectId: "baekan-web",
+  storageBucket: "baekan-web.firebasestorage.app",
+  messagingSenderId: "383257053790",
+  appId: "1:383257053790:web:d75e074e53c6a72d7f42cf"
+};
+
+const app     = initializeApp(firebaseConfig);
+const auth    = getAuth(app);
+const db      = getFirestore(app);
+const storage = getStorage(app);
+const provider = new GoogleAuthProvider();
+
+const ADMIN_EMAIL = "junbsd@gmail.com";
+
+// 사진 리사이즈
+function resizeImage(file, maxW = 800, quality = 0.75) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadPhoto(uid, slot, dataUrl) {
+  const r = ref(storage, `users/${uid}/photos/slot_${slot}`);
+  await uploadString(r, dataUrl, 'data_url');
+  return await getDownloadURL(r);
+}
+async function deletePhoto(uid, slot) {
+  try { await deleteObject(ref(storage, `users/${uid}/photos/slot_${slot}`)); } catch(e) {}
+}
+
+window._FB = {
+  auth, db, storage, provider, ADMIN_EMAIL,
+  signInWithPopup, signOut, onAuthStateChanged,
+  doc, setDoc, getDoc, collection, getDocs, deleteDoc, serverTimestamp,
+  resizeImage, uploadPhoto, deletePhoto
+};
+window.dispatchEvent(new Event('fbReady'));
+</script>
+
+<style>
+:root {
+  --bd:#0a1628;--bm:#0d2b5e;--bb:#2f7be8;--bl:#5ba3f5;--bg2:#7ec8ff;
+  --ac:#f0a500;--al:#ffd166;--w:#fff;--g2:#d8e3f2;--g5:#7a94b8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bd);color:#fff;overflow-x:hidden}
+
+/* ── LOADING ── */
+#loadingOverlay{position:fixed;inset:0;z-index:9000;background:var(--bd);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.spinner{width:48px;height:48px;border:3px solid rgba(47,123,232,.2);
+  border-top-color:var(--bb);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── LOGIN ── */
+#loginScreen{position:fixed;inset:0;z-index:5000;background:var(--bd);
+  display:none;align-items:center;justify-content:center;padding:24px}
+.login-box{width:100%;max-width:380px;text-align:center}
+.login-logo{font-family:'Oswald',sans-serif;font-size:2rem;letter-spacing:3px;margin-bottom:4px}
+.login-sub{font-size:.82rem;color:var(--g5);margin-bottom:40px}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:12px;
+  width:100%;padding:14px 20px;background:#fff;color:#333;border:none;
+  border-radius:12px;font-size:.95rem;font-weight:700;cursor:pointer;
+  font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,.3);transition:transform .15s}
+.google-btn:active{transform:scale(.97)}
+.google-icon{width:22px;height:22px}
+.login-notice{margin-top:20px;font-size:.75rem;color:var(--g5);line-height:1.6;
+  background:rgba(47,123,232,.08);border:1px solid rgba(47,123,232,.2);
+  border-radius:10px;padding:12px 16px}
+.login-err{color:#f85149;font-size:.78rem;margin-top:12px;display:none}
+
+/* ── NOT ALLOWED ── */
+#notAllowed{position:fixed;inset:0;z-index:5001;background:var(--bd);
+  display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
+.not-box{max-width:340px}
+.not-icon{font-size:3rem;margin-bottom:16px}
+.not-title{font-size:1.1rem;font-weight:900;margin-bottom:8px}
+.not-desc{font-size:.82rem;color:var(--g5);line-height:1.6;margin-bottom:20px}
+.not-email{font-size:.75rem;color:var(--bl);background:rgba(47,123,232,.1);
+  border-radius:8px;padding:8px 12px;margin-bottom:16px;word-break:break-all}
+.not-logout{background:rgba(248,81,73,.15);border:1px solid rgba(248,81,73,.3);
+  color:#f85149;padding:10px 20px;border-radius:10px;font-size:.85rem;
+  font-weight:700;cursor:pointer;font-family:inherit}
+
+/* ── TOP BAR ── */
+.top-bar{position:fixed;top:0;left:0;right:0;z-index:998;background:rgba(10,22,40,.95);
+  backdrop-filter:blur(10px);border-bottom:1px solid rgba(47,123,232,.3);
+  padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:'Oswald',sans-serif;font-size:1.2rem;letter-spacing:2px;
+  display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+.top-call-btn{background:var(--bb);color:#fff;border:none;padding:8px 16px;
+  border-radius:20px;font-size:.8rem;font-weight:700;text-decoration:none;
+  display:flex;align-items:center;gap:6px}
+
+/* ── HERO ── */
+.hero{position:relative;min-height:88vh;display:flex;flex-direction:column;
+  justify-content:center;padding:40px 24px 60px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:
+  radial-gradient(ellipse 80% 60% at 50% 30%,rgba(47,123,232,.2) 0%,transparent 70%),
+  linear-gradient(180deg,#0a1628 0%,#0d2b5e 60%,#0a1628 100%)}
+.hero-grid{position:absolute;inset:0;
+  background-image:linear-gradient(rgba(47,123,232,.07) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(47,123,232,.07) 1px,transparent 1px);
+  background-size:32px 32px}
+.hero-content{position:relative;z-index:1}
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;
+  border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid}
+.badge-blue{background:rgba(47,123,232,.15);border-color:rgba(47,123,232,.5);color:var(--bg2)}
+.badge-gold{background:rgba(240,165,0,.15);border-color:rgba(240,165,0,.5);color:var(--al)}
+.hero h1{font-size:2rem;font-weight:900;line-height:1.25;margin-bottom:16px}
+.hero h1 .hl{color:var(--bg2);display:block}
+.hero-desc{font-size:.9rem;line-height:1.7;color:var(--g2);margin-bottom:28px;white-space:pre-line}
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:rgba(47,123,232,.2);border:1px solid rgba(47,123,232,.2);
+  border-radius:12px;overflow:hidden;margin-bottom:28px}
+.stat-item{background:rgba(13,43,94,.6);padding:14px 8px;text-align:center}
+.stat-num{font-family:'Oswald',sans-serif;font-size:1.5rem;color:var(--al);line-height:1}
+.stat-label{font-size:.68rem;color:var(--g5);margin-top:4px}
+.hero-cta{display:flex;flex-direction:column;gap:10px}
+.btn-p{display:flex;align-items:center;justify-content:center;gap:10px;
+  background:linear-gradient(135deg,var(--bb),#1a4fa0);color:#fff;text-decoration:none;
+  padding:16px 24px;border-radius:12px;font-size:1rem;font-weight:900;
+  box-shadow:0 8px 32px rgba(47,123,232,.4);border:1px solid rgba(126,200,255,.3)}
+.btn-s{display:flex;align-items:center;justify-content:center;gap:8px;
+  background:transparent;color:var(--bg2);text-decoration:none;padding:14px 24px;
+  border-radius:12px;font-size:.9rem;font-weight:700;border:1px solid rgba(47,123,232,.4)}
+.btn-k{display:flex;align-items:center;justify-content:center;gap:8px;
+  background:rgba(254,229,0,.15);border:1px solid rgba(254,229,0,.4);color:#FEE500;
+  text-decoration:none;padding:14px 24px;border-radius:12px;font-size:.9rem;font-weight:700}
+.btn-m{display:flex;align-items:center;justify-content:center;gap:8px;
+  background:transparent;color:var(--bg2);text-decoration:none;padding:14px 24px;
+  border-radius:12px;font-size:.9rem;font-weight:700;border:1px solid rgba(47,123,232,.4)}
+
+/* ── SECTIONS ── */
+section{padding:48px 24px}
+.sec-lbl{font-size:.72rem;font-weight:700;letter-spacing:3px;color:var(--bl);
+  text-transform:uppercase;margin-bottom:8px}
+.sec-ttl{font-size:1.5rem;font-weight:900;line-height:1.3;margin-bottom:6px}
+.sec-sub{font-size:.85rem;color:var(--g5);margin-bottom:28px;line-height:1.6}
+.divider{width:40px;height:3px;background:linear-gradient(90deg,var(--bb),transparent);
+  margin:12px 0 24px;border-radius:2px}
+
+/* SERVICES */
+.svc-sec{background:rgba(13,43,94,.3)}
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.svc-card{background:rgba(10,22,40,.8);border:1px solid rgba(47,123,232,.2);
+  border-radius:14px;padding:20px 16px;position:relative;overflow:hidden}
+.svc-card.feat{grid-column:span 2;
+  background:linear-gradient(135deg,rgba(26,79,160,.4),rgba(47,123,232,.15));
+  border-color:rgba(47,123,232,.4)}
+.svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--bb),transparent)}
+.svc-ico{font-size:2rem;margin-bottom:10px}
+.svc-name{font-size:.95rem;font-weight:900;margin-bottom:4px}
+.svc-desc{font-size:.75rem;color:var(--g5);line-height:1.5}
+.svc-urg{display:inline-block;margin-top:8px;font-size:.65rem;font-weight:700;
+  color:var(--ac);background:rgba(240,165,0,.1);padding:2px 8px;border-radius:10px;
+  border:1px solid rgba(240,165,0,.3)}
+
+/* WHY */
+.why-sec{background:var(--bd)}
+.why-list{display:flex;flex-direction:column;gap:16px}
+.why-item{display:flex;gap:16px;align-items:flex-start;background:rgba(13,43,94,.4);
+  border:1px solid rgba(47,123,232,.15);border-radius:12px;padding:16px}
+.why-num{font-family:'Oswald',sans-serif;font-size:1.8rem;
+  color:rgba(47,123,232,.25);line-height:1;min-width:32px}
+.why-ttl{font-size:.95rem;font-weight:900;margin-bottom:4px}
+.why-dsc{font-size:.8rem;color:var(--g5);line-height:1.5}
+
+/* EQUIPMENT */
+.eq-sec{background:var(--bd)}
+.eq-list{display:flex;flex-direction:column;gap:10px}
+.eq-item{display:flex;align-items:center;gap:14px;background:rgba(13,43,94,.4);
+  border:1px solid rgba(47,123,232,.15);border-radius:10px;padding:14px 16px}
+.eq-ico{font-size:1.8rem;min-width:40px;text-align:center}
+.eq-name{font-size:.9rem;font-weight:700}
+.eq-desc{font-size:.75rem;color:var(--g5);margin-top:2px}
+.eq-badge{margin-left:auto;font-size:.65rem;font-weight:700;
+  background:rgba(47,123,232,.15);color:var(--bl);padding:4px 10px;
+  border-radius:20px;white-space:nowrap;border:1px solid rgba(47,123,232,.3)}
+
+/* GALLERY */
+.gal-sec{background:rgba(13,43,94,.2)}
+.gal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gal-item{border-radius:10px;overflow:hidden;background:rgba(13,43,94,.5);
+  border:1px solid rgba(47,123,232,.15);aspect-ratio:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;position:relative}
+.gal-item.wide{grid-column:span 2;aspect-ratio:16/9}
+.gal-item img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.gal-ph-ico{font-size:2.5rem;opacity:.5}
+.gal-ph-txt{font-size:.72rem;color:var(--g5)}
+.gal-tag{font-size:.65rem;font-weight:700;background:rgba(47,123,232,.2);
+  color:var(--bl);padding:2px 8px;border-radius:10px;
+  position:absolute;bottom:8px;left:8px;z-index:1}
+
+/* VIDEO */
+.vid-sec{background:var(--bd)}
+.vid-wrap{position:relative;aspect-ratio:16/9;border-radius:12px;
+  overflow:hidden;background:#0a1628;margin-bottom:16px}
+.vid-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:none}
+.vid-ttl-lbl{font-size:.9rem;font-weight:700;margin-bottom:8px;color:var(--bg2)}
+
+/* REVIEWS */
+.rv-sec{background:rgba(13,43,94,.3)}
+.stars{color:var(--ac);font-size:1rem;margin-bottom:4px}
+.rv-cards{display:flex;flex-direction:column;gap:12px}
+.rv-card{background:rgba(10,22,40,.7);border:1px solid rgba(47,123,232,.15);
+  border-radius:12px;padding:16px}
+.rv-author{font-size:.85rem;font-weight:700;display:block;margin-bottom:4px}
+.rv-txt{font-size:.82rem;color:var(--g2);line-height:1.6}
+.rv-loc{font-size:.72rem;color:var(--g5);margin-top:6px}
+
+/* CONTACT */
+.ct-sec{background:linear-gradient(180deg,rgba(13,43,94,.4) 0%,var(--bd) 100%)}
+.ct-card{background:linear-gradient(135deg,rgba(26,79,160,.3),rgba(47,123,232,.1));
+  border:1px solid rgba(47,123,232,.3);border-radius:16px;padding:28px 20px;text-align:center}
+.ct-name{font-family:'Oswald',sans-serif;font-size:1.8rem;letter-spacing:3px;margin-bottom:6px}
+.ct-tag{font-size:.82rem;color:var(--g5);margin-bottom:24px}
+.ct-num{font-family:'Oswald',sans-serif;font-size:2rem;color:var(--al);
+  letter-spacing:2px;margin-bottom:20px}
+.ct-btns{display:flex;flex-direction:column;gap:10px}
+.ct-info{display:flex;flex-direction:column;gap:8px;margin-top:20px;text-align:left}
+.ct-info-item{display:flex;gap:10px;align-items:center;font-size:.82rem;color:var(--g2)}
+.sns-grid{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.sns-lnk{display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;
+  text-decoration:none;font-size:.85rem;font-weight:700}
+
+/* BOTTOM BAR */
+.bb-bar{position:fixed;bottom:0;left:0;right:0;z-index:999;display:flex;
+  background:#0a1628;border-top:1px solid rgba(47,123,232,.2);
+  padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+.bb-btn{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;text-decoration:none;padding:6px 4px;
+  border-right:1px solid rgba(255,255,255,.05)}
+.bb-btn:last-child{border-right:none}
+.bb-ph{background:rgba(47,123,232,.15)}
+.bb-ka{background:rgba(254,229,0,.1)}
+.bb-sm{background:rgba(63,185,80,.1)}
+.bb-ico{font-size:1.4rem;display:block}
+.bb-lbl{font-size:.62rem;font-weight:700}
+.bb-ph .bb-lbl{color:#7ec8ff}
+.bb-ka .bb-lbl{color:#FEE500}
+.bb-sm .bb-lbl{color:#3fb950}
+@keyframes shake{0%,100%{transform:rotate(0)}10%{transform:rotate(-15deg)}
+  20%{transform:rotate(15deg)}30%{transform:rotate(-10deg)}
+  40%{transform:rotate(10deg)}50%{transform:rotate(0)}}
+.shake{animation:shake 2s ease-in-out infinite}
+
+footer{background:#050d1a;padding:24px;text-align:center;
+  border-top:1px solid rgba(47,123,232,.1)}
+footer p{font-size:.72rem;color:var(--g5);line-height:1.8;white-space:pre-line}
+main{padding-top:60px;padding-bottom:80px}
+.fade-in{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.fade-in.visible{opacity:1;transform:translateY(0)}
+.s-hide{display:none!important}
+
+/* ── ADMIN FAB ── */
+.adm-fab{position:fixed;bottom:90px;right:16px;z-index:997;
+  background:rgba(10,22,40,.92);border:1px solid rgba(47,123,232,.35);
+  color:var(--bl);width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+  cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+
+/* ── ADMIN OVERLAY ── */
+#admOverlay{display:none;position:fixed;inset:0;z-index:2000;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+#admOverlay.open{display:block}
+#admDrawer{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:500px;
+  background:#0f1923;overflow-y:auto;z-index:2001;
+  transform:translateX(100%);transition:transform .3s ease;
+  display:flex;flex-direction:column}
+#admOverlay.open #admDrawer{transform:translateX(0)}
+
+/* ADMIN HEADER */
+.adm-hdr{position:sticky;top:0;z-index:10;background:#162030;
+  border-bottom:1px solid rgba(56,139,253,.2);padding:12px 16px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.adm-hdr-left{display:flex;align-items:center;gap:10px}
+.adm-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--bb)}
+.adm-avatar-ph{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--bb),#1a4fa0);
+  display:flex;align-items:center;justify-content:center;font-size:1rem}
+.adm-hdr-info{}
+.adm-hdr-name{font-size:.85rem;font-weight:900;color:#e6edf3}
+.adm-hdr-email{font-size:.65rem;color:#7d8590}
+.adm-hdr-badge{display:inline-block;font-size:.55rem;font-weight:900;
+  padding:2px 6px;border-radius:10px;margin-left:6px;vertical-align:middle}
+.badge-admin{background:var(--ac);color:#000}
+.badge-user{background:var(--bb);color:#fff}
+.adm-hdr-btns{display:flex;gap:6px}
+.adm-logout{background:rgba(248,81,73,.15);border:1px solid rgba(248,81,73,.3);
+  color:#f85149;padding:6px 10px;border-radius:16px;font-size:.7rem;
+  font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.adm-close{background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.3);
+  color:#7ec8ff;width:32px;height:32px;border-radius:50%;cursor:pointer;
+  font-size:1rem;display:flex;align-items:center;justify-content:center}
+
+/* ADMIN TABS */
+.adm-tabs{display:flex;background:#162030;
+  border-bottom:1px solid rgba(56,139,253,.2);overflow-x:auto;flex-shrink:0}
+.adm-tab{padding:10px 13px;font-size:.76rem;font-weight:700;color:#7d8590;
+  border:none;background:none;cursor:pointer;font-family:inherit;
+  white-space:nowrap;border-bottom:2px solid transparent}
+.adm-tab.on{color:#388bfd;border-bottom-color:#388bfd}
+
+.adm-body{padding:16px;flex:1}
+.adm-panel{display:none}
+.adm-panel.on{display:block}
+
+/* ADMIN CARD */
+.ac{background:#162030;border:1px solid rgba(56,139,253,.2);
+  border-radius:10px;padding:16px;margin-bottom:14px}
+.ac-ttl{font-size:.76rem;font-weight:900;color:#388bfd;
+  text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.af{margin-bottom:12px}
+.al{display:block;font-size:.72rem;color:#7d8590;margin-bottom:5px;font-weight:700}
+.ah{font-size:.67rem;color:#7d8590;margin-top:4px;line-height:1.5}
+.ai{width:100%;background:#1e2d40;border:1px solid rgba(56,139,253,.2);
+  border-radius:8px;padding:10px 12px;color:#e6edf3;font-family:inherit;
+  font-size:.84rem;outline:none;transition:border-color .2s}
+.ai:focus{border-color:#388bfd}
+textarea.ai{resize:vertical;min-height:70px;line-height:1.6}
+
+/* TOGGLE */
+.tog-row{display:flex;align-items:center;justify-content:space-between;
+  padding:9px 0;border-bottom:1px solid rgba(56,139,253,.08)}
+.tog-row:last-child{border-bottom:none}
+.tog-name{font-size:.82rem;font-weight:700}
+.tog-sub{font-size:.67rem;color:#7d8590;margin-top:2px}
+.tog{position:relative;width:42px;height:22px;background:#1e2d40;border-radius:11px;
+  border:1px solid rgba(56,139,253,.2);cursor:pointer;transition:background .2s;flex-shrink:0}
+.tog.on{background:#388bfd;border-color:#388bfd}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:left .2s}
+.tog.on::after{left:23px}
+
+/* PHOTO GRID */
+.ph-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.ph-slot{aspect-ratio:1;border-radius:8px;border:1.5px dashed rgba(56,139,253,.3);
+  background:#1e2d40;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;cursor:pointer;position:relative;overflow:hidden}
+.ph-slot:hover{border-color:#388bfd}
+.ph-slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:7px}
+.ph-slot .s-ico{font-size:1.3rem}
+.ph-slot .s-lbl{font-size:.57rem;color:#7d8590;margin-top:3px;text-align:center;padding:0 3px}
+.ph-slot .s-rm{position:absolute;top:3px;right:3px;background:rgba(248,81,73,.9);
+  color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.65rem;
+  cursor:pointer;display:none;align-items:center;justify-content:center;z-index:2}
+.ph-slot:hover .s-rm{display:flex}
+.ph-progress{position:absolute;inset:0;background:rgba(10,22,40,.85);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;border-radius:7px}
+.ph-progress-bar{width:70%;height:4px;background:rgba(47,123,232,.2);border-radius:2px;overflow:hidden}
+.ph-progress-fill{height:100%;background:var(--bb);border-radius:2px;
+  transition:width .3s;width:0%}
+.ph-progress-txt{font-size:.62rem;color:#7ec8ff}
+
+/* VID PREVIEW */
+.vid-prev{background:#1e2d40;border-radius:8px;aspect-ratio:16/9;
+  display:flex;align-items:center;justify-content:center;margin-top:8px;
+  overflow:hidden;position:relative;font-size:.74rem;color:#7d8590;text-align:center}
+.vid-prev iframe{position:absolute;inset:0;width:100%;height:100%;border:none}
+
+/* REVIEW BLOCK */
+.rv-blk{background:#1e2d40;border-radius:8px;padding:12px;margin-bottom:10px}
+.rv-blk-t{font-size:.7rem;color:#388bfd;font-weight:700;margin-bottom:8px}
+
+/* VID ENTRY */
+.ve{background:#1e2d40;border-radius:8px;padding:12px;margin-bottom:10px}
+.ve-t{font-size:.7rem;color:#388bfd;font-weight:700;margin-bottom:8px}
+
+/* SAVE BTN */
+.save-btn{width:100%;padding:13px;background:linear-gradient(135deg,#388bfd,#1a4fa0);
+  color:#fff;border:none;border-radius:10px;font-size:.93rem;font-weight:900;
+  cursor:pointer;font-family:inherit;transition:background .2s;margin-top:4px}
+.save-btn.saved{background:#3fb950}
+.save-btn:disabled{opacity:.6;cursor:not-allowed}
+
+/* USER MANAGEMENT */
+.user-card{background:#1e2d40;border:1px solid rgba(56,139,253,.12);
+  border-radius:10px;padding:12px 14px;margin-bottom:10px;
+  display:flex;align-items:center;gap:10px}
+.u-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;
+  border:2px solid rgba(47,123,232,.3);flex-shrink:0}
+.u-avatar-ph{width:40px;height:40px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--bb),#1a4fa0);
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem}
+.u-info{flex:1;min-width:0}
+.u-name{font-size:.85rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u-email{font-size:.68rem;color:#7d8590;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u-time{font-size:.62rem;color:rgba(56,139,253,.6);margin-top:2px}
+.u-me{font-size:.62rem;color:#3fb950;font-weight:700;
+  background:rgba(63,185,80,.1);padding:2px 6px;border-radius:8px}
+.u-admin-badge{font-size:.6rem;color:var(--ac);font-weight:700;
+  background:rgba(240,165,0,.1);padding:2px 6px;border-radius:8px;margin-left:4px}
+.u-block{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.25);
+  color:#f85149;padding:5px 10px;border-radius:8px;font-size:.7rem;
+  font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.u-block.blocked{background:rgba(63,185,80,.12);border-color:rgba(63,185,80,.25);color:#3fb950}
+
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+  background:#3fb950;color:#fff;padding:10px 20px;border-radius:20px;
+  font-size:.82rem;font-weight:700;opacity:0;pointer-events:none;
+  transition:opacity .3s;z-index:9999;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.toast.err{background:#f85149}
+</style>
+</head>
+<body>
+
+<!-- 로딩 -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div style="font-size:.82rem;color:var(--g5)">불러오는 중...</div>
+</div>
+
+<!-- 로그인 -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">배관사무소</div>
+    <div class="login-sub">업무 관리 시스템</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <svg class="google-icon" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Google 계정으로 로그인
+    </button>
+    <div class="login-notice">
+      💡 관리자(junbsd@gmail.com)가 승인한 구글 계정만 접속할 수 있습니다.<br>
+      처음 로그인하면 관리자 승인 후 사용 가능합니다.
+    </div>
+    <div class="login-err" id="loginErr">로그인에 실패했습니다. 다시 시도해주세요.</div>
+  </div>
+</div>
+
+<!-- 미승인 화면 -->
+<div id="notAllowed" style="display:none;position:fixed;inset:0;z-index:5001;background:var(--bd);
+  align-items:center;justify-content:center;padding:24px;text-align:center">
+  <div class="not-box">
+    <div class="not-icon">🔒</div>
+    <div class="not-title">접근 권한이 없습니다</div>
+    <div class="not-desc">관리자의 승인이 필요합니다.<br>아래 이메일로 로그인하셨나요?</div>
+    <div class="not-email" id="notEmail"></div>
+    <div class="not-desc" style="margin-bottom:12px">
+      관리자(junbsd@gmail.com)에게 승인 요청하세요.<br>
+      승인 후 다시 로그인해주세요.
+    </div>
+    <button class="not-logout" onclick="doLogout()">다른 계정으로 로그인</button>
+  </div>
+</div>
+
+<!-- 홈페이지 -->
+<div id="homePage" style="display:none">
+  <header class="top-bar">
+    <div class="logo"><div class="logo-dot"></div><span id="h-biz">배관사무소</span></div>
+    <a id="h-topCall" href="tel:01037820301" class="top-call-btn">📞 지금 전화</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-bg"></div><div class="hero-grid"></div>
+      <div class="hero-content">
+        <div class="badge-row fade-in">
+          <span class="badge badge-gold" id="h-b1">⚡ 24시간 출동</span>
+          <span class="badge badge-blue" id="h-b2">✅ 당일 해결</span>
+          <span class="badge badge-blue" id="h-b3">🔒 사후 AS 보장</span>
+        </div>
+        <h1 class="fade-in">
+          <span class="hl" id="h-t1">막힌 곳, 새는 곳</span>
+          <span id="h-t2">오늘 바로 해결합니다.</span>
+        </h1>
+        <p class="hero-desc fade-in" id="h-desc">하수구 · 변기 · 싱크대 막힘부터
+누수 탐지 · 수전교체까지
+신속하게 출동합니다.</p>
+        <div class="hero-stats fade-in">
+          <div class="stat-item"><div class="stat-num" id="h-stat">2,000+</div><div class="stat-label">누적 시공</div></div>
+          <div class="stat-item"><div class="stat-num">24h</div><div class="stat-label">연중무휴</div></div>
+          <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">AS 보장</div></div>
+        </div>
+        <div class="hero-cta fade-in">
+          <a id="h-call" href="tel:01037820301" class="btn-p">📞 <span id="h-phone">010-3782-0301</span> 전화하기</a>
+          <a href="#services" class="btn-s">서비스 항목 보기 ↓</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="svc-sec fade-in" id="services">
+      <div class="sec-lbl">Services</div>
+      <div class="sec-ttl">전문 시공 서비스</div>
+      <div class="divider"></div>
+      <div class="svc-grid">
+        <div class="svc-card feat"><div class="svc-ico">🚽</div><div class="svc-name">변기 막힘 해결</div><div class="svc-desc">전문 장비로 완벽 해결. 내시경 포함.</div><span class="svc-urg">🔴 긴급 출동</span></div>
+        <div class="svc-card"><div class="svc-ico">🏠</div><div class="svc-name">하수구 막힘</div><div class="svc-desc">욕실·베란다·주방 하수구 처리.</div><span class="svc-urg">🔴 당일</span></div>
+        <div class="svc-card"><div class="svc-ico">🍳</div><div class="svc-name">싱크대 막힘</div><div class="svc-desc">주방 배관 전문 세척.</div></div>
+        <div class="svc-card"><div class="svc-ico">💧</div><div class="svc-name">누수 탐지·수리</div><div class="svc-desc">정밀 탐지 후 수리.</div><span class="svc-urg">⚠️ 긴급</span></div>
+        <div class="svc-card"><div class="svc-ico">🔩</div><div class="svc-name">수전·부속 교체</div><div class="svc-desc">신속 교체 서비스.</div></div>
+        <div class="svc-card"><div class="svc-ico">🔍</div><div class="svc-name">내시경 점검</div><div class="svc-desc">카메라로 정확히 진단.</div></div>
+      </div>
+    </section>
+
+    <section class="why-sec fade-in">
+      <div class="sec-lbl">Why Us</div><div class="sec-ttl">왜 선택하나요?</div><div class="divider"></div>
+      <div class="why-list">
+        <div class="why-item"><div class="why-num">01</div><div><div class="why-ttl">⚡ 빠른 출동, 당일 해결</div><div class="why-dsc">연락 즉시 출동. 대부분 당일 완료.</div></div></div>
+        <div class="why-item"><div class="why-num">02</div><div><div class="why-ttl">💰 무료 견적, 추가 비용 없음</div><div class="why-dsc">작업 전 명확한 금액 안내.</div></div></div>
+        <div class="why-item"><div class="why-num">03</div><div><div class="why-ttl">🔧 전문 장비 보유</div><div class="why-dsc">고압 세척기, 내시경 카메라 보유.</div></div></div>
+        <div class="why-item"><div class="why-num">04</div><div><div class="why-ttl">🛡 AS 확실 보장</div><div class="why-dsc">재발 시 책임지고 다시 처리.</div></div></div>
+        <div class="why-item"><div class="why-num">05</div><div><div class="why-ttl">📋 친절한 상담</div><div class="why-dsc">원인과 해결 방법 쉽게 설명.</div></div></div>
+      </div>
+    </section>
+
+    <section class="eq-sec fade-in" id="sec-eq">
+      <div class="sec-lbl">Equipment</div><div class="sec-ttl">보유 장비</div><div class="divider"></div>
+      <div class="eq-list">
+        <div class="eq-item"><div class="eq-ico">🎥</div><div><div class="eq-name">배관 내시경 카메라</div><div class="eq-desc">파이프 내부 실시간 확인</div></div><div class="eq-badge">정밀 진단</div></div>
+        <div class="eq-item"><div class="eq-ico">💥</div><div><div class="eq-name">고압 세척기</div><div class="eq-desc">강력한 수압으로 완전 제거</div></div><div class="eq-badge">강력 세척</div></div>
+        <div class="eq-item"><div class="eq-ico">🌀</div><div><div class="eq-name">전동 스프링 기계</div><div class="eq-desc">깊은 막힘 완전 제거</div></div><div class="eq-badge">심부 제거</div></div>
+        <div class="eq-item"><div class="eq-ico">🔍</div><div><div class="eq-name">누수 탐지기</div><div class="eq-desc">비파괴 방식 정밀 탐지</div></div><div class="eq-badge">비파괴</div></div>
+        <div class="eq-item"><div class="eq-ico">🔧</div><div><div class="eq-name">전문 배관 공구</div><div class="eq-desc">현장 즉시 처리</div></div><div class="eq-badge">즉시 처리</div></div>
+      </div>
+    </section>
+
+    <section class="gal-sec fade-in" id="sec-gal">
+      <div class="sec-lbl">Gallery</div><div class="sec-ttl">시공 사진</div><div class="divider"></div>
+      <div class="gal-grid" id="h-gallery"></div>
+    </section>
+
+    <section class="vid-sec fade-in" id="sec-vid">
+      <div class="sec-lbl">Video</div><div class="sec-ttl">시공 영상</div><div class="divider"></div>
+      <div id="h-videos"></div>
+    </section>
+
+    <section style="padding:32px 24px;background:rgba(13,43,94,.2)" id="sec-sns" class="fade-in s-hide">
+      <div class="sec-lbl">Follow</div><div class="sec-ttl">SNS 채널</div><div class="divider"></div>
+      <div class="sns-grid" id="h-sns"></div>
+    </section>
+
+    <section class="rv-sec fade-in" id="sec-rv">
+      <div class="sec-lbl">Reviews</div><div class="sec-ttl">고객 후기</div><div class="divider"></div>
+      <div class="rv-cards" id="h-reviews"></div>
+    </section>
+
+    <section class="ct-sec fade-in">
+      <div class="sec-lbl">Contact</div><div class="sec-ttl">지금 바로 연락하세요</div><div class="divider"></div>
+      <div class="ct-card">
+        <div class="ct-name" id="h-cname">배관사무소</div>
+        <div class="ct-tag" id="h-ctag">막힘·누수·수전교체 전문</div>
+        <div class="ct-num" id="h-cnum">010-3782-0301</div>
+        <div class="ct-btns">
+          <a id="h-cbtn" href="tel:01037820301" class="btn-p">📞 전화 연결하기</a>
+          <a id="h-kbtn" href="#" class="btn-k">🐤 카카오톡 문의</a>
+          <a id="h-sbtn" href="#" class="btn-m">💬 문자 보내기</a>
+        </div>
+        <div class="ct-info">
+          <div class="ct-info-item"><span>⏰</span><span id="h-hours">24시간 365일</span></div>
+          <div class="ct-info-item"><span>📍</span><span id="h-area">서울·경기 전 지역</span></div>
+          <div class="ct-info-item"><span>💰</span><span>현장 무료 견적</span></div>
+          <div class="ct-info-item"><span>🛡</span><span>AS 확실 보장</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer><p id="h-footer">배관사무소</p></footer>
+
+  <div class="bb-bar">
+    <a id="h-bb-ph" href="tel:01037820301" class="bb-btn bb-ph"><span class="bb-ico shake">📞</span><span class="bb-lbl">전화</span></a>
+    <a id="h-bb-ka" href="#" class="bb-btn bb-ka"><span class="bb-ico">🐤</span><span class="bb-lbl">카카오톡</span></a>
+    <a id="h-bb-sm" href="#" class="bb-btn bb-sm"><span class="bb-ico">💬</span><span class="bb-lbl">문자</span></a>
+  </div>
+  <div class="adm-fab" onclick="openAdm()">⚙️</div>
+</div>
+
+<!-- ══════════════ ADMIN DRAWER ══════════════ -->
+<div id="admOverlay" onclick="ovClick(event)">
+  <div id="admDrawer">
+
+    <div class="adm-hdr">
+      <div class="adm-hdr-left">
+        <div id="adm-avt" class="adm-avatar-ph">👤</div>
+        <div class="adm-hdr-info">
+          <div class="adm-hdr-name" id="adm-name">사용자
+            <span class="adm-hdr-badge badge-user" id="adm-badge">USER</span>
+          </div>
+          <div class="adm-hdr-email" id="adm-email"></div>
+        </div>
+      </div>
+      <div class="adm-hdr-btns">
+        <button class="adm-logout" onclick="doLogout()">로그아웃</button>
+        <button class="adm-close" onclick="closeAdm()">✕</button>
+      </div>
+    </div>
+
+    <div class="adm-tabs">
+      <button class="adm-tab on" onclick="aTab('basic',this)">📋 기본</button>
+      <button class="adm-tab" onclick="aTab('contact',this)">📞 연락처</button>
+      <button class="adm-tab" onclick="aTab('text',this)">✏️ 문구</button>
+      <button class="adm-tab" onclick="aTab('media',this)">📸 사진·영상</button>
+      <button class="adm-tab" onclick="aTab('sns',this)">🔗 SNS</button>
+      <button class="adm-tab s-hide" id="tab-users" onclick="aTab('users',this)">👥 사용자관리</button>
+    </div>
+
+    <div class="adm-body">
+
+      <!-- 기본 -->
+      <div class="adm-panel on" id="ap-basic">
+        <div class="ac">
+          <div class="ac-ttl">🏢 업체 정보</div>
+          <div class="af"><label class="al">업체명</label><input class="ai" id="a-biz" value="배관사무소"></div>
+          <div class="af"><label class="al">슬로건</label><input class="ai" id="a-slogan" value="막힘·누수·수전교체 전문"></div>
+          <div class="af"><label class="al">영업 지역</label><input class="ai" id="a-area" value="서울·경기 전 지역"></div>
+          <div class="af"><label class="al">영업 시간</label><input class="ai" id="a-hours" value="24시간 365일 연중무휴"></div>
+          <div class="af"><label class="al">누적 시공 건수</label><input class="ai" id="a-stat" value="2,000+"></div>
+        </div>
+        <div class="ac">
+          <div class="ac-ttl">👁 섹션 표시</div>
+          <div class="tog-row"><div><div class="tog-name">장비 현황</div></div><div class="tog on" id="t-eq" onclick="this.classList.toggle('on')"></div></div>
+          <div class="tog-row"><div><div class="tog-name">시공 사진</div></div><div class="tog on" id="t-gal" onclick="this.classList.toggle('on')"></div></div>
+          <div class="tog-row"><div><div class="tog-name">시공 영상</div></div><div class="tog on" id="t-vid" onclick="this.classList.toggle('on')"></div></div>
+          <div class="tog-row"><div><div class="tog-name">고객 후기</div></div><div class="tog on" id="t-rv" onclick="this.classList.toggle('on')"></div></div>
+        </div>
+        <button class="save-btn" onclick="doSave(this)">💾 저장 — 모든 기기 즉시 반영</button>
+      </div>
+
+      <!-- 연락처 -->
+      <div class="adm-panel" id="ap-contact">
+        <div class="ac">
+          <div class="ac-ttl">📞 전화번호</div>
+          <div class="af"><label class="al">대표 전화번호</label><input class="ai" id="a-phone" value="010-3782-0301"><div class="ah">📱 클릭 시 아이폰·안드로이드 바로 전화 연결</div></div>
+        </div>
+        <div class="ac">
+          <div class="ac-ttl">🐤 카카오톡</div>
+          <div class="tog-row"><div><div class="tog-name">카카오톡 버튼 표시</div></div><div class="tog on" id="t-ka" onclick="this.classList.toggle('on')"></div></div>
+          <div class="af" style="margin-top:12px"><label class="al">카카오 채널 URL</label><input class="ai" id="a-kakao" placeholder="https://pf.kakao.com/..."><div class="ah">비워두면 문자로 연결</div></div>
+        </div>
+        <div class="ac">
+          <div class="ac-ttl">💬 문자</div>
+          <div class="tog-row"><div><div class="tog-name">문자 버튼 표시</div></div><div class="tog on" id="t-sms" onclick="this.classList.toggle('on')"></div></div>
+          <div class="af" style="margin-top:12px"><label class="al">자동입력 문구</label><input class="ai" id="a-smstext" value="안녕하세요, 배관 문의드립니다."></div>
+        </div>
+        <button class="save-btn" onclick="doSave(this)">💾 저장 — 모든 기기 즉시 반영</button>
+      </div>
+
+      <!-- 문구 -->
+      <div class="adm-panel" id="ap-text">
+        <div class="ac">
+          <div class="ac-ttl">🦸 첫 화면 문구</div>
+          <div class="af"><label class="al">강조 문구 (파란색)</label><input class="ai" id="a-t1" value="막힌 곳, 새는 곳"></div>
+          <div class="af"><label class="al">부제목</label><input class="ai" id="a-t2" value="오늘 바로 해결합니다."></div>
+          <div class="af"><label class="al">설명 문구</label><textarea class="ai" id="a-desc">하수구 · 변기 · 싱크대 막힘부터
+누수 탐지 · 수전교체까지
+신속하게 출동합니다.</textarea></div>
+        </div>
+        <div class="ac">
+          <div class="ac-ttl">🏷 뱃지</div>
+          <div class="af"><label class="al">뱃지 1</label><input class="ai" id="a-b1" value="⚡ 24시간 출동"></div>
+          <div class="af"><label class="al">뱃지 2</label><input class="ai" id="a-b2" value="✅ 당일 해결"></div>
+          <div class="af"><label class="al">뱃지 3</label><input class="ai" id="a-b3" value="🔒 사후 AS 보장"></div>
+        </div>
+        <div class="ac">
+          <div class="ac-ttl">💬 고객 후기</div>
+          <div class="rv-blk"><div class="rv-blk-t">후기 1</div>
+            <div class="af"><label class="al">작성자</label><input class="ai rv-name" value="김*영 고객님"></div>
+            <div class="af"><label class="al">내용</label><textarea class="ai rv-text">새벽에 변기가 막혀서 급하게 연락했는데 빠르게 와주셔서 너무 감사했어요.</textarea></div>
+            <div class="af"><label class="al">위치</label><input class="ai rv-loc" value="아파트 거주"></div>
+          </div>
+          <div class="rv-blk"><div class="rv-blk-t">후기 2</div>
+            <div class="af"><label class="al">작성자</label><input class="ai rv-name" value="이*준 고객님"></div>
+            <div class="af"><label class="al">내용</label><textarea class="ai rv-text">싱크대 밑에서 물이 새서 연락했더니 당일 바로 오셔서 수전 교체까지 해주셨어요.</textarea></div>
+            <div class="af"><label class="al">위치</label><input class="ai rv-loc" value="빌라 거주"></div>
+          </div>
+          <div class="rv-blk"><div class="rv-blk-t">후기 3</div>
+            <div class="af"><label class="al">작성자</label><input class="ai rv-name" value="박*수 고객님"></div>
+            <div class="af"><label class="al">내용</label><textarea class="ai rv-text">화장실 하수구 냄새가 심해서 불렀는데 내시경으로 원인을 바로 찾아서 해결해주셨어요.</textarea></div>
+            <div class="af"><label class="al">위치</label><input class="ai rv-loc" value="오피스텔 거주"></div>
+          </div>
+        </div>
+        <button class="save-btn" onclick="doSave(this)">💾 저장 — 모든 기기 즉시 반영</button>
+      </div>
+
+      <!-- 사진·영상 -->
+      <div class="adm-panel" id="ap-media">
+        <div class="ac">
+          <div class="ac-ttl">📸 시공 사진 (최대 6장)</div>
+          <p style="font-size:.72rem;color:#7d8590;margin-bottom:10px;line-height:1.5">
+            칸을 눌러 사진 업로드 → 자동 압축 후 저장됩니다.</p>
+          <div class="ph-grid" id="a-photos"></div>
+          <div class="ah">자동으로 800px / 75% 품질로 압축해서 저장</div>
+        </div>
+        <div class="ac">
+          <div class="ac-ttl">🎬 영상 (유튜브·틱톡)</div>
+          <div class="ve"><div class="ve-t">영상 1</div>
+            <div class="af"><label class="al">제목</label><input class="ai vid-ttl" placeholder="예: 변기 막힘 해결"></div>
+            <div class="af"><label class="al">URL</label><input type="url" class="ai vid-url" placeholder="https://youtu.be/..." oninput="prevVid(this)"></div>
+            <div class="vid-prev">▶ URL 입력 시 미리보기</div>
+          </div>
+          <div class="ve"><div class="ve-t">영상 2</div>
+            <div class="af"><label class="al">제목</label><input class="ai vid-ttl" placeholder="예: 하수구 고압세척"></div>
+            <div class="af"><label class="al">URL</label><input type="url" class="ai vid-url" placeholder="https://youtu.be/..." oninput="prevVid(this)"></div>
+            <div class="vid-prev">▶ URL 입력 시 미리보기</div>
+          </div>
+          <div class="ah" style="margin-top:4px">✅ 유튜브·유튜브 쇼츠·틱톡 지원</div>
+        </div>
+        <button class="save-btn" onclick="doSave(this)">💾 저장 — 모든 기기 즉시 반영</button>
+      </div>
+
+      <!-- SNS -->
+      <div class="adm-panel" id="ap-sns">
+        <div class="ac">
+          <div class="ac-ttl">🔗 SNS 링크</div>
+          <div class="af"><label class="al">🐤 카카오 채널</label><input class="ai" id="a-s-ka" placeholder="https://pf.kakao.com/..."></div>
+          <div class="af"><label class="al">▶ 유튜브 채널</label><input class="ai" id="a-s-yt" placeholder="https://youtube.com/@..."></div>
+          <div class="af"><label class="al">♪ 틱톡</label><input class="ai" id="a-s-tt" placeholder="https://tiktok.com/@..."></div>
+          <div class="af"><label class="al">📸 인스타그램</label><input class="ai" id="a-s-ig" placeholder="https://instagram.com/..."></div>
+          <div class="af"><label class="al">N 네이버</label><input class="ai" id="a-s-nv" placeholder="https://blog.naver.com/..."></div>
+        </div>
+        <button class="save-btn" onclick="doSave(this)">💾 저장 — 모든 기기 즉시 반영</button>
+      </div>
+
+      <!-- 사용자 관리 (관리자 전용) -->
+      <div class="adm-panel" id="ap-users">
+        <div class="ac">
+          <div class="ac-ttl">👥 가입 신청 목록</div>
+          <p style="font-size:.72rem;color:#7d8590;margin-bottom:12px;line-height:1.5">
+            구글로 로그인한 사용자 목록입니다.<br>
+            ✅ 승인된 사용자만 홈페이지를 관리할 수 있습니다.</p>
+          <div id="userList"><div style="text-align:center;color:#7d8590;padding:16px;font-size:.8rem">불러오는 중...</div></div>
+        </div>
+        <div class="ac">
+          <div class="ac-ttl">➕ 사용자 직접 승인</div>
+          <p style="font-size:.72rem;color:#7d8590;margin-bottom:12px;line-height:1.5">
+            직원의 구글 이메일을 입력해서 미리 승인해두세요.</p>
+          <div class="af"><label class="al">구글 이메일</label><input class="ai" id="approve-email" placeholder="직원 구글 이메일"></div>
+          <div class="af"><label class="al">이름 (선택)</label><input class="ai" id="approve-name" placeholder="예: 홍길동"></div>
+          <button class="save-btn" style="background:linear-gradient(135deg,#3fb950,#2d9140)" onclick="preApprove()">✅ 미리 승인하기</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept="image/*" style="display:none" onchange="onPhoto(event)">
+
+<script>
+let FB = null;
+let uid = null, isAdmin = false, curSlot = null;
+let SD = {}; // settings data
+const photoURLs = Array(6).fill(null);
+const LABELS = ['하수구 전','하수구 후','변기 전','변기 후','누수 수리','수전 교체'];
+
+window.addEventListener('fbReady', () => {
+  FB = window._FB;
+  FB.onAuthStateChanged(FB.auth, async user => {
+    hide('loadingOverlay');
+    if (!user) { show('loginScreen','flex'); return; }
+
+    // 구글 계정 확인
+    const email = user.email;
+    uid = user.uid;
+    isAdmin = (email === FB.ADMIN_EMAIL);
+
+    // 승인 여부 확인
+    const allowed = await checkAllowed(uid, email);
+    if (!allowed) {
+      // 미승인: 로그인 기록 저장 후 대기 화면
+      await FB.setDoc(FB.doc(FB.db,'pending',uid), {
+        email, displayName: user.displayName || email,
+        photoURL: user.photoURL || null,
+        requestedAt: new Date().toISOString()
+      });
+      hide('loginScreen');
+      document.getElementById('notEmail').textContent = email;
+      document.getElementById('notAllowed').style.display = 'flex';
+      return;
+    }
+
+    // 승인됨
+    hide('loginScreen');
+    document.getElementById('notAllowed').style.display = 'none';
+    show('homePage','block');
+
+    // 어드민 헤더
+    const nameEl = document.getElementById('adm-name');
+    const avtEl  = document.getElementById('adm-avt');
+    nameEl.childNodes[0].textContent = (user.displayName || email.split('@')[0]) + ' ';
+    document.getElementById('adm-email').textContent = email;
+    document.getElementById('adm-badge').textContent = isAdmin ? 'ADMIN' : 'USER';
+    document.getElementById('adm-badge').className = 'adm-hdr-badge ' + (isAdmin ? 'badge-admin' : 'badge-user');
+    if (user.photoURL) {
+      avtEl.outerHTML = `<img id="adm-avt" class="adm-avatar" src="${user.photoURL}" alt="">`;
+    }
+    if (isAdmin) showEl('tab-users');
+
+    initPhotoGrid();
+    await loadData();
+    applyHome();
+    initFade();
+  });
+});
+
+async function checkAllowed(uid, email) {
+  if (email === FB.ADMIN_EMAIL) return true;
+  // approved 컬렉션 확인 (UID 또는 이메일)
+  const byUid   = await FB.getDoc(FB.doc(FB.db, 'approved', uid));
+  if (byUid.exists()) return true;
+  // 이메일로 미리 승인된 경우 UID로 업데이트
+  const snap = await FB.getDocs(FB.collection(FB.db, 'approved'));
+  for (const d of snap.docs) {
+    if (d.data().email === email) {
+      await FB.setDoc(FB.doc(FB.db,'approved',uid), { ...d.data(), uid, approvedAt: new Date().toISOString() });
+      return true;
+    }
+  }
+  return false;
+}
+
+async function doGoogleLogin() {
+  try {
+    await FB.signInWithPopup(FB.auth, FB.provider);
+  } catch(e) {
+    document.getElementById('loginErr').style.display = 'block';
+    document.getElementById('loginErr').textContent = e.message;
+  }
+}
+async function doLogout() {
+  await FB.signOut(FB.auth);
+  hide('homePage'); hide('notAllowed');
+  show('loginScreen','flex');
+  closeAdm();
+}
+
+// ── 데이터 로드 ──
+async function loadData() {
+  const snap = await FB.getDoc(FB.doc(FB.db,'users',uid,'data','settings'));
+  if (snap.exists()) {
+    SD = snap.data();
+    fillForm(SD);
+    for (let i = 0; i < 6; i++) {
+      photoURLs[i] = SD[`photo_${i}`] || null;
+      updateSlot(i);
+    }
+  }
+}
+
+function fillForm(s) {
+  sv('a-biz', s.bizName); sv('a-slogan', s.slogan); sv('a-area', s.area);
+  sv('a-hours', s.hours); sv('a-stat', s.statCount);
+  sv('a-phone', s.phone); sv('a-kakao', s.kakaoUrl); sv('a-smstext', s.smsText);
+  sv('a-t1', s.title1); sv('a-t2', s.title2); sv('a-desc', s.desc);
+  sv('a-b1', s.badge1); sv('a-b2', s.badge2); sv('a-b3', s.badge3);
+  sv('a-s-ka', s.snsKakao); sv('a-s-yt', s.snsYt); sv('a-s-tt', s.snsTt);
+  sv('a-s-ig', s.snsIg); sv('a-s-nv', s.snsNv);
+  tog('t-eq', s.showEq); tog('t-gal', s.showGal);
+  tog('t-vid', s.showVid); tog('t-rv', s.showRv);
+  tog('t-ka', s.showKa); tog('t-sms', s.showSms);
+  if (s.reviews) {
+    const blks = document.querySelectorAll('.rv-blk');
+    s.reviews.forEach((r,i) => {
+      if (!blks[i]) return;
+      blks[i].querySelector('.rv-name').value = r.name||'';
+      blks[i].querySelector('.rv-text').value = r.text||'';
+      blks[i].querySelector('.rv-loc').value  = r.loc||'';
+    });
+  }
+  if (s.videos) {
+    const es = document.querySelectorAll('.ve');
+    s.videos.forEach((v,i) => {
+      if (!es[i]) return;
+      es[i].querySelector('.vid-ttl').value = v.title||'';
+      es[i].querySelector('.vid-url').value = v.url||'';
+      if (v.url) prevVid(es[i].querySelector('.vid-url'));
+    });
+  }
+}
+
+// ── 저장 ──
+async function doSave(btn) {
+  btn.disabled = true; btn.textContent = '저장 중...';
+  try {
+    const s = gather();
+    for (let i = 0; i < 6; i++) s[`photo_${i}`] = photoURLs[i]||null;
+    await FB.setDoc(FB.doc(FB.db,'users',uid,'data','settings'), s);
+    SD = s; applyHome();
+    btn.classList.add('saved'); btn.textContent = '✅ 저장 완료!';
+    toast('✅ 저장됐습니다! 모든 기기에 즉시 반영됩니다', false);
+    setTimeout(() => { btn.textContent='💾 저장 — 모든 기기 즉시 반영'; btn.classList.remove('saved'); btn.disabled=false; }, 2500);
+  } catch(e) {
+    toast('❌ ' + e.message, true);
+    btn.textContent='💾 저장 — 모든 기기 즉시 반영'; btn.disabled=false;
+  }
+}
+
+function gather() {
+  const reviews = [...document.querySelectorAll('.rv-blk')].map(b => ({
+    name: b.querySelector('.rv-name').value,
+    text: b.querySelector('.rv-text').value,
+    loc:  b.querySelector('.rv-loc').value
+  }));
+  const videos = [...document.querySelectorAll('.ve')].map(e => ({
+    title: e.querySelector('.vid-ttl').value,
+    url:   e.querySelector('.vid-url').value
+  }));
+  return {
+    bizName:gv('a-biz'), slogan:gv('a-slogan'), area:gv('a-area'),
+    hours:gv('a-hours'), statCount:gv('a-stat'),
+    phone:gv('a-phone'), kakaoUrl:gv('a-kakao'), smsText:gv('a-smstext'),
+    title1:gv('a-t1'), title2:gv('a-t2'), desc:gv('a-desc'),
+    badge1:gv('a-b1'), badge2:gv('a-b2'), badge3:gv('a-b3'),
+    snsKakao:gv('a-s-ka'), snsYt:gv('a-s-yt'), snsTt:gv('a-s-tt'),
+    snsIg:gv('a-s-ig'), snsNv:gv('a-s-nv'),
+    showEq:on('t-eq'), showGal:on('t-gal'), showVid:on('t-vid'), showRv:on('t-rv'),
+    showKa:on('t-ka'), showSms:on('t-sms'),
+    reviews, videos, updatedAt: new Date().toISOString()
+  };
+}
+
+// ── 홈 반영 ──
+function applyHome() {
+  const s = SD;
+  const ph = s.phone || '010-3782-0301';
+  const pr = ph.replace(/-/g,'');
+  const kh = (s.kakaoUrl&&s.kakaoUrl.trim()) ? s.kakaoUrl : `sms:${pr}`;
+  const smh = `sms:${pr}?body=${encodeURIComponent(s.smsText||'안녕하세요, 배관 문의드립니다.')}`;
+
+  st('h-biz',  s.bizName||'배관사무소');
+  st('h-b1',   s.badge1||'⚡ 24시간 출동');
+  st('h-b2',   s.badge2||'✅ 당일 해결');
+  st('h-b3',   s.badge3||'🔒 사후 AS 보장');
+  st('h-t1',   s.title1||'막힌 곳, 새는 곳');
+  st('h-t2',   s.title2||'오늘 바로 해결합니다.');
+  st('h-desc', s.desc||'');
+  st('h-stat', s.statCount||'2,000+');
+  st('h-phone',ph);
+  st('h-cname',s.bizName||'배관사무소');
+  st('h-ctag', (s.slogan||'') + ' / ' + (s.hours||'24시간'));
+  st('h-cnum', ph);
+  st('h-hours',s.hours||'24시간 365일');
+  st('h-area', s.area||'서울·경기 전 지역');
+  st('h-footer',(s.bizName||'배관사무소')+'\n📞 '+ph+'\n'+(s.area||''));
+
+  lk('h-topCall',`tel:${pr}`); lk('h-call',`tel:${pr}`);
+  lk('h-cbtn',`tel:${pr}`); lk('h-kbtn',kh); lk('h-sbtn',smh);
+  lk('h-bb-ph',`tel:${pr}`); lk('h-bb-ka',kh); lk('h-bb-sm',smh);
+
+  sec('sec-eq',  s.showEq  !== false);
+  sec('sec-gal', s.showGal !== false);
+  sec('sec-rv',  s.showRv  !== false);
+  vis('h-bb-ka', s.showKa  !== false);
+  vis('h-bb-sm', s.showSms !== false);
+  vis('h-kbtn',  s.showKa  !== false);
+  vis('h-sbtn',  s.showSms !== false);
+
+  // 갤러리
+  const grid = document.getElementById('h-gallery');
+  grid.innerHTML = photoURLs.map((url,i) => {
+    const w = i===4?'wide':'';
+    return url
+      ? `<div class="gal-item ${w}"><img src="${url}" loading="lazy"><div class="gal-tag">${LABELS[i]}</div></div>`
+      : `<div class="gal-item ${w}"><div class="gal-ph-ico">📷</div><div class="gal-tag">${LABELS[i]}</div><div class="gal-ph-txt">사진 준비중</div></div>`;
+  }).join('');
+
+  // 영상
+  const vb = document.getElementById('h-videos');
+  const vids = (s.videos||[]).filter(v=>v.url&&v.url.trim());
+  vb.innerHTML = vids.map(v => {
+    const em = embed(v.url); if(!em) return '';
+    return `<div class="vid-ttl-lbl">${v.title||'시공 영상'}</div><div class="vid-wrap"><iframe src="${em}" allowfullscreen allow="autoplay;encrypted-media"></iframe></div>`;
+  }).join('');
+  sec('sec-vid', s.showVid !== false && vids.length > 0);
+
+  // 후기
+  const rb = document.getElementById('h-reviews');
+  rb.innerHTML = (s.reviews||[]).map(r =>
+    `<div class="rv-card"><span class="rv-author">${r.name}</span><div class="stars">★★★★★</div><p class="rv-txt">${r.text}</p><div class="rv-loc">📍 ${r.loc}</div></div>`
+  ).join('');
+
+  // SNS
+  const sb = document.getElementById('h-sns');
+  const snsLinks = [];
+  if(s.snsYt)  snsLinks.push(`<a href="${s.snsYt}"  target="_blank" class="sns-lnk" style="background:rgba(255,0,0,.1);border:1px solid rgba(255,0,0,.2);color:#ff4444">▶ 유튜브</a>`);
+  if(s.snsTt)  snsLinks.push(`<a href="${s.snsTt}"  target="_blank" class="sns-lnk" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#fff">♪ 틱톡</a>`);
+  if(s.snsIg)  snsLinks.push(`<a href="${s.snsIg}"  target="_blank" class="sns-lnk" style="background:rgba(225,48,108,.1);border:1px solid rgba(225,48,108,.2);color:#e1306c">📸 인스타그램</a>`);
+  if(s.snsNv)  snsLinks.push(`<a href="${s.snsNv}"  target="_blank" class="sns-lnk" style="background:rgba(3,199,90,.1);border:1px solid rgba(3,199,90,.2);color:#03C75A">N 네이버</a>`);
+  sb.innerHTML = snsLinks.join('');
+  document.getElementById('sec-sns').classList.toggle('s-hide', snsLinks.length===0);
+}
+
+// ── 사진 ──
+function initPhotoGrid() {
+  const grid = document.getElementById('a-photos');
+  grid.innerHTML = '';
+  for (let i=0; i<6; i++) {
+    const s = document.createElement('div');
+    s.className='ph-slot'; s.dataset.i=i;
+    s.innerHTML=`<div class="s-ico">📷</div><div class="s-lbl">${LABELS[i]}</div><button class="s-rm" onclick="rmPhoto(event,${i})">✕</button>`;
+    s.addEventListener('click', ()=>{ curSlot=i; document.getElementById('fileInput').click(); });
+    grid.appendChild(s);
+  }
+}
+function updateSlot(i) {
+  const slots = document.querySelectorAll('.ph-slot');
+  if (!slots[i]) return;
+  if (photoURLs[i]) {
+    slots[i].innerHTML=`<img src="${photoURLs[i]}" alt=""><button class="s-rm" onclick="rmPhoto(event,${i})">✕</button>`;
+  } else {
+    slots[i].innerHTML=`<div class="s-ico">📷</div><div class="s-lbl">${LABELS[i]}</div><button class="s-rm" onclick="rmPhoto(event,${i})">✕</button>`;
+  }
+}
+async function onPhoto(e) {
+  const file = e.target.files[0]; if(!file) return;
+  const i = curSlot;
+  const slots = document.querySelectorAll('.ph-slot');
+  slots[i].innerHTML=`<div class="ph-progress"><div class="ph-progress-bar"><div class="ph-progress-fill" id="pf-${i}"></div></div><div class="ph-progress-txt">압축 중...</div></div>`;
+  try {
+    const resized = await FB.resizeImage(file, 800, 0.75);
+    document.getElementById(`pf-${i}`) && (document.getElementById(`pf-${i}`).style.width='50%');
+    slots[i].querySelector('.ph-progress-txt') && (slots[i].querySelector('.ph-progress-txt').textContent='업로드 중...');
+    const url = await FB.uploadPhoto(uid, i, resized);
+    document.getElementById(`pf-${i}`) && (document.getElementById(`pf-${i}`).style.width='100%');
+    photoURLs[i] = url;
+    // 즉시 저장
+    const upd = {...SD}; upd[`photo_${i}`]=url;
+    await FB.setDoc(FB.doc(FB.db,'users',uid,'data','settings'), upd);
+    SD = upd; updateSlot(i); applyHome();
+    toast('📸 사진이 저장됐습니다!', false);
+  } catch(err) {
+    toast('❌ ' + err.message, true); updateSlot(i);
+  }
+  e.target.value='';
+}
+async function rmPhoto(e, i) {
+  e.stopPropagation();
+  await FB.deletePhoto(uid, i);
+  photoURLs[i]=null;
+  const upd={...SD}; upd[`photo_${i}`]=null;
+  await FB.setDoc(FB.doc(FB.db,'users',uid,'data','settings'), upd);
+  SD=upd; updateSlot(i); applyHome();
+  toast('🗑 사진 삭제됐습니다', false);
+}
+
+// ── 사용자 관리 ──
+async function loadUsers() {
+  const box = document.getElementById('userList');
+  box.innerHTML='<div style="text-align:center;color:#7d8590;padding:12px;font-size:.8rem">불러오는 중...</div>';
+  try {
+    // pending (로그인 신청)
+    const pendSnap  = await FB.getDocs(FB.collection(FB.db,'pending'));
+    const apprSnap  = await FB.getDocs(FB.collection(FB.db,'approved'));
+    const approvedEmails = new Set();
+    apprSnap.forEach(d => { if(d.data().email) approvedEmails.add(d.data().email); });
+
+    box.innerHTML='';
+    if (pendSnap.empty && apprSnap.empty) {
+      box.innerHTML='<div style="text-align:center;color:#7d8590;padding:12px;font-size:.8rem">아직 로그인한 사용자가 없습니다</div>';
+      return;
+    }
+
+    // 승인된 사용자 먼저
+    apprSnap.forEach(d => {
+      const data = d.data();
+      if (data.email === FB.ADMIN_EMAIL) return;
+      box.appendChild(makeUserCard(d.id, data, true, false));
+    });
+
+    // 대기 중
+    pendSnap.forEach(d => {
+      const data = d.data();
+      if (approvedEmails.has(data.email) || data.email===FB.ADMIN_EMAIL) return;
+      box.appendChild(makeUserCard(d.id, data, false, true));
+    });
+  } catch(err) {
+    box.innerHTML=`<div style="color:#f85149;font-size:.78rem;padding:12px">${err.message}</div>`;
+  }
+}
+
+function makeUserCard(id, data, approved, pending) {
+  const card = document.createElement('div');
+  card.className='user-card';
+  const avt = data.photoURL
+    ? `<img class="u-avatar" src="${data.photoURL}" alt="">`
+    : `<div class="u-avatar-ph">👤</div>`;
+  const statusBadge = approved
+    ? `<span style="font-size:.6rem;color:#3fb950;background:rgba(63,185,80,.1);padding:2px 6px;border-radius:8px;margin-left:4px">✅ 승인됨</span>`
+    : `<span style="font-size:.6rem;color:#f0a500;background:rgba(240,165,0,.1);padding:2px 6px;border-radius:8px;margin-left:4px">⏳ 대기중</span>`;
+  const actionBtn = approved
+    ? `<button class="u-block" onclick="revokeUser('${id}','${data.email}')">취소</button>`
+    : `<button class="u-block blocked" onclick="approveUser('${id}','${data.email||''}','${data.displayName||''}','${data.photoURL||''}')">승인</button>`;
+  card.innerHTML=`
+    ${avt}
+    <div class="u-info">
+      <div class="u-name">${data.displayName||data.email||id}${statusBadge}</div>
+      <div class="u-email">${data.email||''}</div>
+      <div class="u-time">${data.approvedAt ? '승인: '+data.approvedAt.substring(0,10) : data.requestedAt ? '신청: '+data.requestedAt.substring(0,10) : ''}</div>
+    </div>
+    ${actionBtn}`;
+  return card;
+}
+
+async function approveUser(uid2, email, name, photo) {
+  try {
+    await FB.setDoc(FB.doc(FB.db,'approved',uid2), {
+      uid:uid2, email, displayName:name, photoURL:photo,
+      approvedBy: FB.ADMIN_EMAIL, approvedAt: new Date().toISOString()
+    });
+    // pending 에서 제거
+    await FB.deleteDoc(FB.doc(FB.db,'pending',uid2));
+    toast('✅ 승인됐습니다', false);
+    loadUsers();
+  } catch(e) { toast('❌ '+e.message, true); }
+}
+async function revokeUser(uid2, email) {
+  if (!confirm(`"${email}" 의 접근 권한을 취소하시겠습니까?`)) return;
+  try {
+    await FB.deleteDoc(FB.doc(FB.db,'approved',uid2));
+    toast('🗑 승인이 취소됐습니다', false);
+    loadUsers();
+  } catch(e) { toast('❌ '+e.message, true); }
+}
+async function preApprove() {
+  const email = document.getElementById('approve-email').value.trim();
+  const name  = document.getElementById('approve-name').value.trim();
+  if (!email) { toast('이메일을 입력하세요', true); return; }
+  try {
+    await FB.setDoc(FB.doc(FB.db,'approved','pre_'+email.replace(/[@.]/g,'_')), {
+      email, displayName: name||email, preApproved: true,
+      approvedBy: FB.ADMIN_EMAIL, approvedAt: new Date().toISOString()
+    });
+    document.getElementById('approve-email').value='';
+    document.getElementById('approve-name').value='';
+    toast('✅ 미리 승인됐습니다. 이 이메일로 로그인하면 바로 사용 가능합니다', false);
+    loadUsers();
+  } catch(e) { toast('❌ '+e.message, true); }
+}
+
+// ── 어드민 UI ──
+function openAdm() {
+  document.getElementById('admOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeAdm() {
+  document.getElementById('admOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+function ovClick(e) { if(e.target===document.getElementById('admOverlay')) closeAdm(); }
+function aTab(name, el) {
+  document.querySelectorAll('.adm-tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.adm-panel').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('ap-'+name).classList.add('on');
+  if (name==='users') loadUsers();
+}
+
+// ── 영상 ──
+function embed(url) {
+  if(!url) return null;
+  const yt=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+  if(yt) return `https://www.youtube.com/embed/${yt[1]}`;
+  const tt=url.match(/tiktok\.com\/@[\w.]+\/video\/(\d+)/);
+  if(tt) return `https://www.tiktok.com/embed/v2/${tt[1]}`;
+  return null;
+}
+function prevVid(input) {
+  const prev=input.closest('.ve').querySelector('.vid-prev');
+  const em=embed(input.value.trim());
+  prev.innerHTML=em?`<iframe src="${em}" allowfullscreen allow="autoplay;encrypted-media"></iframe>`:'▶ URL 입력 시 미리보기';
+}
+
+// ── 유틸 ──
+const gv  = id => { const e=document.getElementById(id); return e?e.value:''; };
+const sv  = (id,v) => { const e=document.getElementById(id); if(e&&v!==undefined) e.value=v; };
+const on  = id => { const e=document.getElementById(id); return e?e.classList.contains('on'):true; };
+const tog = (id,v) => { const e=document.getElementById(id); if(e) e.classList.toggle('on',v!==false); };
+const st  = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+const lk  = (id,v) => { const e=document.getElementById(id); if(e) e.href=v; };
+const sec = (id,show) => { const e=document.getElementById(id); if(e) e.classList.toggle('s-hide',!show); };
+const vis = (id,show) => { const e=document.getElementById(id); if(e) e.style.display=show?'':'none'; };
+const hide = id => { const e=document.getElementById(id); if(e) e.style.display='none'; };
+const show = (id,d='block') => { const e=document.getElementById(id); if(e) e.style.display=d; };
+const showEl = id => { const e=document.getElementById(id); if(e) e.classList.remove('s-hide'); };
+
+function toast(msg, isErr) {
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(isErr?' err':'');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+function initFade() {
+  const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');}),{threshold:.1});
+  document.querySelectorAll('.fade-in').forEach(el=>obs.observe(el));
+}
+</script>
+</body>
+</html>
