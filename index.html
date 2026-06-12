@@ -642,7 +642,15 @@ textarea.ai{resize:vertical;min-height:70px;line-height:1.6}
     </section>
   </main>
 
-  <footer><p id="h-footer">배관사무소</p></footer>
+  <footer>
+    <p id="h-footer">배관사무소</p>
+    <div id="adminLoginArea" style="margin-top:16px">
+      <button id="adminLoginBtn" onclick="toggleAdminLogin()" style="background:none;border:none;color:rgba(255,255,255,0.08);font-size:.6rem;cursor:pointer;font-family:inherit;padding:4px 8px;letter-spacing:1px">관리자</button>
+      <div id="adminLoginBox" style="display:none;margin-top:10px">
+        <button onclick="showLoginModal('관리자 로그인')" style="background:rgba(47,123,232,.15);border:1px solid rgba(47,123,232,.25);color:rgba(126,200,255,.7);padding:8px 20px;border-radius:20px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit">🔐 구글 계정으로 로그인</button>
+      </div>
+    </div>
+  </footer>
 
   <div class="bb">
     <a id="h-bb-ph" href="tel:01037820301" class="bbb bb-ph"><span class="bb-ic shake">📞</span><span class="bb-lb">전화</span></a>
@@ -923,6 +931,12 @@ window.addEventListener('fbReady', () => {
     await loadData(viewUID);
     applyHome();
     initFade();
+
+    // 로그인 됐으면 footer 로그인 버튼 숨김
+    if (user) {
+      const area = document.getElementById('adminLoginArea');
+      if (area) area.style.display = 'none';
+    }
 
     // 내 페이지면 수정 UI 표시
     if (isMyPage) {
@@ -1306,6 +1320,11 @@ const sec=(id,show)=>{const e=document.getElementById(id);if(e)e.classList.toggl
 const vis=(id,show)=>{const e=document.getElementById(id);if(e)e.style.display=show?'':'none';};
 const xhide=(id)=>{const e=document.getElementById(id);if(e)e.style.display='none';};
 const xshow=(id,d='block')=>{const e=document.getElementById(id);if(e)e.style.display=d;};
+
+function toggleAdminLogin(){
+  const box=document.getElementById('adminLoginBox');
+  box.style.display=box.style.display==='none'?'block':'none';
+}
 
 function toast(msg,isErr){
   const t=document.getElementById('toast');
