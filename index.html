@@ -1329,8 +1329,8 @@ const st=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
 const lk=(id,v)=>{const e=document.getElementById(id);if(e)e.href=v;};
 const sec=(id,show)=>{const e=document.getElementById(id);if(e)e.classList.toggle('xhide',!show);};
 const vis=(id,show)=>{const e=document.getElementById(id);if(e)e.style.display=show?'':'none';};
-const xhide=(id)=>{const e=document.getElementById(id);if(e)e.style.display='none';};
-const xshow=(id,d='block')=>{const e=document.getElementById(id);if(e)e.style.display=d;};
+const xhide=(id)=>{const e=document.getElementById(id);if(e){e.style.display='none';e.classList.add('xhide');}};
+const xshow=(id,d='block')=>{const e=document.getElementById(id);if(e){e.classList.remove('xhide');e.style.display=d;}};
 
 function toggleAdminLogin(){
   const box=document.getElementById('adminLoginBox');
